@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Match the store screens' dark theme. -->
+    <color name="brand">#2FA37E</color>
+    <color name="page_bg">#0E1412</color>
+    <color name="nav_bg">#17201C</color>
+</resources>

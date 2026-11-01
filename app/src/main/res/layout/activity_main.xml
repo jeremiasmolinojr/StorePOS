@@ -1,91 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Full-screen store screens. The two bars fill the space behind the status bar
+     and the navigation bar; MainActivity sets their heights from the window insets. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/page_bg"
     android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        style="@style/AppToolbar" />
-
-    <ScrollView
+    <View
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:background="@color/brand" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="20dp">
+    <WebView
+        android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/tagline"
-                android:textColor="@color/muted"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/itemCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnPriceCheck"
-                style="@style/BigButton"
-                android:text="@string/btn_price_check" />
-            <TextView style="@style/Sub" android:text="@string/btn_price_check_sub" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnRegister"
-                style="@style/BigButton"
-                android:text="@string/btn_register" />
-            <TextView style="@style/Sub" android:text="@string/btn_register_sub" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnItems"
-                style="@style/BigButton"
-                android:text="@string/btn_items" />
-            <TextView style="@style/Sub" android:text="@string/btn_items_sub" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="@string/backup_header"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnExport"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:text="@string/btn_export" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnImport"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:layout_weight="1"
-                    android:text="@string/btn_import" />
-            </LinearLayout>
-
-            <TextView style="@style/Sub" android:text="@string/backup_hint" />
-        </LinearLayout>
-    </ScrollView>
+    <View
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/nav_bg" />
 </LinearLayout>

@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Barcode scanning and item photos -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -12,32 +13,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.StorePOS">
 
+        <!-- Rotating or attaching a keyboard keeps the current sale on screen. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".RegisterActivity"
-            android:label="@string/title_register"
-            android:parentActivityName=".MainActivity"
-            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
-
-        <activity
-            android:name=".PriceCheckActivity"
-            android:label="@string/title_price_check"
-            android:parentActivityName=".MainActivity"
-            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
-
-        <activity
-            android:name=".ItemListActivity"
-            android:label="@string/title_items"
-            android:parentActivityName=".MainActivity"
-            android:windowSoftInputMode="stateAlwaysHidden|adjustResize" />
 
         <!-- Let the camera scanner rotate with the phone (portrait friendly) -->
         <activity

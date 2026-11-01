@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F7B5F">
+<title>StorePOS Prototype</title>
+<style>
+/* Layout: one phone-width column; green store band on top, receipt-tape cart, fixed tab bar at the bottom */
+:root{
+  --bg:#F2F5F1; --surface:#FFFFFF; --sunk:#E7ECE7; --ink:#14201A; --muted:#5A6961; --line:#D6DED8;
+  --brand:#0F7B5F; --brand-strong:#0A5C47; --on-brand:#FFFFFF; --brand-soft:#DCEEE6;
+  --tape:#FFFDF4; --tape-line:#E4DCC6; --scrim:rgba(10,20,16,.45);
+  --good:#1C7A3A; --good-soft:#DCF0E1; --warn:#9A5800; --warn-soft:#FBEACD; --bad:#B3261E; --bad-soft:#F8DDDA;
+  --f-display:'Archivo','Arial Narrow',system-ui,sans-serif;
+  --f-body:'Figtree',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --gutter-l:max(16px,env(safe-area-inset-left,0px)); --gutter-r:max(16px,env(safe-area-inset-right,0px));
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1412; --surface:#17201C; --sunk:#202B26; --ink:#E4EDE8; --muted:#9BABA3; --line:#2B3732;
+  --brand:#2FA37E; --brand-strong:#5CCAA4; --on-brand:#04120D; --brand-soft:#173329;
+  --tape:#1B2420; --tape-line:#34413B; --scrim:rgba(0,0,0,.6);
+  --good:#6DCB8C; --good-soft:#163222; --warn:#E6A84E; --warn-soft:#3A2B13; --bad:#F28A80; --bad-soft:#3D1D1A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1412; --surface:#17201C; --sunk:#202B26; --ink:#E4EDE8; --muted:#9BABA3; --line:#2B3732;
+  --brand:#2FA37E; --brand-strong:#5CCAA4; --on-brand:#04120D; --brand-soft:#173329;
+  --tape:#1B2420; --tape-line:#34413B; --scrim:rgba(0,0,0,.6);
+  --good:#6DCB8C; --good-soft:#163222; --warn:#E6A84E; --warn-soft:#3A2B13; --bad:#F28A80; --bad-soft:#3D1D1A; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--f-body);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--brand)}
+body.locked{overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap-in{max-width:560px;margin:0 auto;padding-left:var(--gutter-l);padding-right:var(--gutter-r)}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .bad{color:var(--bad)} .warn{color:var(--warn)} .good{color:var(--good)} .strong{font-weight:600}
+
+/* header band */
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--brand);color:var(--on-brand)}
+header.top .wrap-in{display:flex;align-items:center;gap:10px;padding-block:12px}
+.store{flex:1;min-width:0}
+.store b{display:block;font:800 19px/1.15 var(--f-display);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.store span{font-size:12.5px;opacity:.85}
+.who{display:flex;align-items:center;gap:6px;border:0;background:color-mix(in srgb,var(--on-brand) 16%,transparent);color:var(--on-brand);padding:7px 11px;border-radius:999px;font-size:13px;font-weight:600}
+.who i{font-style:normal;font-weight:500;opacity:.8}
+.iconbtn{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:10px;background:color-mix(in srgb,var(--on-brand) 16%,transparent);color:var(--on-brand)}
+.sample{background:var(--brand-soft);color:var(--ink);font-size:12.5px}
+.sample .wrap-in{padding-block:6px}
+
+/* main */
+main .wrap-in{padding-block:14px calc(96px + env(safe-area-inset-bottom,0px))}
+.view{display:grid;gap:14px}
+h2.sec{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:6px 0 -4px;font:700 12.5px/1.2 var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h2.sec .muted{font:500 12.5px var(--f-body);letter-spacing:0;text-transform:none}
+h3{margin:0;font:700 17px/1.25 var(--f-display);text-wrap:balance}
+.note{margin:0;color:var(--muted);font-size:13.5px}
+.empty{margin:0;padding:18px 14px;color:var(--muted);text-align:center;font-size:14px}
+
+/* controls */
+.input{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:16px}
+.input:focus{outline:2px solid var(--brand);outline-offset:-1px;border-color:transparent}
+.input.big{min-height:52px;font-size:17px}
+.input.money{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+select.input{appearance:auto}
+.fl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:2px 0 -4px}
+.form{display:grid;gap:10px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two>div{display:grid;gap:10px;min-width:0}
+.row{display:flex;gap:8px;align-items:center}
+.row>.input{flex:1;min-width:0}
+.row.end{justify-content:flex-end}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:10px 16px;border-radius:10px;border:1px solid transparent;font-weight:600;font-size:15px;white-space:nowrap}
+.btn.primary{background:var(--brand);color:var(--on-brand)}
+.btn.ghost{background:var(--surface);border-color:var(--line)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.wide{width:100%}
+.btn.grow{flex:1}
+.actions{display:flex;gap:8px}
+.link{border:0;background:none;padding:4px 0;color:var(--brand-strong);font-weight:600;font-size:14px;text-align:left;justify-self:start}
+.check{display:flex;gap:10px;align-items:center;font-size:15px;padding:4px 0}
+.check input{width:20px;height:20px;accent-color:var(--brand)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.seg{display:flex;gap:4px;padding:4px;background:var(--sunk);border-radius:12px}
+.seg button{flex:1;border:0;background:none;border-radius:9px;padding:9px 8px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.seg.wrap{flex-wrap:wrap}
+.seg.wrap button{flex:1 1 30%}
+.seg.small button{font-size:13px}
+fieldset.box{border:1px solid var(--line);border-radius:12px;padding:10px 12px 12px;margin:0;display:grid;gap:10px}
+legend{font-size:13px;font-weight:700;padding:0 4px}
+.flag{display:inline-block;margin-top:4px;padding:3px 8px;border-radius:6px;font-size:12.5px;font-weight:600}
+.flag.warn{background:var(--warn-soft);color:var(--warn)}
+.flag.bad{background:var(--bad-soft);color:var(--bad)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.tag{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--brand-soft);color:var(--brand-strong);vertical-align:2px}
+
+/* sell */
+.suggest{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:-6px}
+.suggest button{display:flex;justify-content:space-between;gap:12px;border:0;background:none;padding:12px 14px;text-align:left}
+.suggest button+button{border-top:1px solid var(--line)}
+.held{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.held .lbl{font-size:12.5px;font-weight:600;color:var(--muted);margin-right:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));gap:8px}
+.tile{display:grid;align-content:space-between;gap:4px;min-height:86px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);text-align:left}
+.tile:active{transform:scale(.98)}
+.tname{font-size:13.5px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tprice{font:600 15px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--brand-strong)}
+.tstock{font-size:11.5px;color:var(--muted)}
+.tile.low .tstock{color:var(--warn);font-weight:600}
+.tile.out{opacity:.7}
+.tile.out .tstock{color:var(--bad);font-weight:600}
+.tapewrap{filter:drop-shadow(0 0 .5px var(--tape-line)) drop-shadow(0 1px 1px var(--tape-line));margin-bottom:8px}
+.tape{position:relative;background:var(--tape);border-radius:10px 10px 0 0}
+.tape::after{content:"";position:absolute;left:0;right:0;bottom:-9px;height:9px;background:conic-gradient(from 135deg at top,var(--tape) 90deg,transparent 0) 0 0/14px 100% repeat-x}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:11px 12px;border-bottom:1px dashed var(--tape-line)}
+.lname{font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+.lprice{border:0;background:none;padding:2px 0;font:500 12.5px var(--f-mono);color:var(--muted);text-decoration:underline dotted;text-underline-offset:3px}
+.stepper{display:flex;align-items:center;gap:2px}
+.stepper button{width:36px;height:36px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:18px;font-weight:600;line-height:1}
+.stepper span{min-width:28px;text-align:center;font:600 15px var(--f-mono)}
+.lsum{min-width:76px;text-align:right;font:600 15px var(--f-mono);font-variant-numeric:tabular-nums}
+.tape-total{display:flex;justify-content:space-between;align-items:baseline;padding:14px 12px 8px}
+.tape-total span{font:700 13px var(--f-display);letter-spacing:.08em;text-transform:uppercase}
+.tape-total strong{font:700 24px var(--f-mono);font-variant-numeric:tabular-nums}
+.sticky-pay{position:sticky;bottom:calc(66px + env(safe-area-inset-bottom,0px));z-index:4;padding:10px 0;margin-bottom:-10px;background:var(--bg);border-top:1px solid var(--line)}
+.sukli{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px;border-radius:12px;background:var(--sunk)}
+.sukli .lbl,.big .lbl,.hero .lbl,.stat .lbl{font:700 12px var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sukli strong{font:800 34px var(--f-display);font-variant-numeric:tabular-nums}
+.result{text-align:center;display:grid;gap:6px;padding:8px 0 4px}
+.result .lbl{font:700 13px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.result strong{font:800 52px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--brand-strong)}
+.receipt{background:var(--tape);border:1px dashed var(--tape-line);border-radius:10px;padding:10px 12px;font:500 13px/1.6 var(--f-mono);font-variant-numeric:tabular-nums}
+.receipt div{display:flex;justify-content:space-between;gap:10px}
+.receipt .tot{border-top:1px dashed var(--tape-line);margin-top:6px;padding-top:6px;font-weight:600}
+
+/* lists, cards */
+.list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.list li+li{border-top:1px solid var(--line)}
+.rowbtn,.rowstatic{display:flex;width:100%;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;border:0;background:none;text-align:left}
+.rmain{display:grid;gap:2px;min-width:0}
+.rname{font-weight:600;font-size:15px;overflow-wrap:anywhere}
+.rmeta{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.rside{display:grid;justify-items:end;gap:3px;flex:none}
+.rprice{font:600 15px var(--f-mono);font-variant-numeric:tabular-nums}
+.rmargin{font-size:12px;color:var(--muted)}
+.rmargin.bad{color:var(--bad);font-weight:600}
+.card{display:grid;gap:10px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.cardhead .muted{font-size:13px}
+.hero{display:grid;gap:2px;padding:16px;border-radius:14px;background:var(--brand-soft)}
+.hero strong{font:800 34px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.big{display:grid;gap:2px}
+.big strong{font:800 32px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.kvs{margin:0;display:grid;gap:4px;padding:10px 0;border-block:1px solid var(--line)}
+.kvs div,.kv{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.kvs dt{color:var(--muted)} .kvs dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.kv strong{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.kv.total{font-weight:700;padding-top:6px;border-top:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{display:grid;align-content:start;gap:2px;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;min-width:0}
+.stat strong{font:700 clamp(16px,4.6vw,21px)/1.2 var(--f-display);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.stat small{font-size:12px;color:var(--muted)}
+.tblwrap{overflow-x:auto;margin:0 -2px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font:700 11.5px var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 6px;white-space:nowrap}
+.tbl td{padding:8px 6px;border-top:1px solid var(--line);vertical-align:top}
+.tbl .n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rline{display:grid;grid-template-columns:minmax(0,1fr) 64px 92px;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.rline select{grid-column:1/-1}
+.rline input[type=date]{grid-column:1/3}
+.x{width:40px;height:40px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:18px;justify-self:end}
+.totals{display:grid;align-content:end;gap:2px;font-size:13.5px}
+.repack{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center}
+.repack .btn{grid-column:1/-1}
+.arrow{font:600 13px var(--f-mono);color:var(--muted);text-align:center}
+.bars{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;align-items:end;height:110px;padding-top:6px}
+.bars i{display:block;background:var(--brand);opacity:.55;border-radius:3px 3px 0 0;min-height:2px}
+.bars i.peak{opacity:1}
+.barlbl{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;font:500 10.5px var(--f-mono);color:var(--muted)}
+.barlbl span{text-align:center;white-space:nowrap}
+.pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:300px;margin:0 auto;width:100%}
+.pinpad button{min-height:56px;border:1px solid var(--line);border-radius:12px;background:var(--surface);font:600 22px var(--f-mono)}
+.pindots{display:flex;justify-content:center;gap:12px;padding:8px 0}
+.pindots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.pindots i.on{background:var(--ink);border-color:var(--ink)}
+textarea.input{min-height:140px;font:500 12px/1.4 var(--f-mono)}
+.confirm{display:grid;gap:8px;padding:12px;border-radius:12px;background:var(--bad-soft)}
+.confirm p{margin:0;color:var(--bad);font-weight:600;font-size:14px}
+
+/* photos & scanning */
+img{max-width:100%}
+.list:empty{display:none}
+.thumb{width:44px;height:44px;border-radius:9px;object-fit:cover;flex:none;background:var(--sunk);display:grid;place-items:center;font:700 17px var(--f-display);color:var(--muted)}
+.timg{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;background:var(--sunk)}
+.btn.sq{min-width:52px;padding:10px 12px}
+.btn svg{width:22px;height:22px;flex:none}
+.sugl{display:flex;gap:10px;align-items:center;min-width:0}
+.rowbtn .rmain{flex:1}
+.photorow{display:flex;gap:12px;align-items:center}
+.photobox{width:96px;height:96px;border-radius:12px;object-fit:cover;background:var(--sunk);display:grid;place-items:center;color:var(--muted);font-size:12.5px;text-align:center;flex:none;border:1px dashed var(--line)}
+.photobtns{display:grid;gap:6px;justify-items:start}
+.pcres{display:grid;justify-items:center;gap:6px;text-align:center;padding:6px 0}
+.pcres img,.pcres .ph{width:160px;height:160px;border-radius:14px;object-fit:cover}
+.pcres .ph{display:grid;place-items:center;background:var(--sunk);font:800 56px var(--f-display);color:var(--muted)}
+.pcprice{font:800 48px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--brand-strong)}
+.pcres .actions{width:100%}
+textarea.plain{font:400 15px/1.5 var(--f-body);min-height:170px}
+
+/* tabs */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs .wrap-in{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding-block:2px}
+.tab{display:grid;justify-items:center;gap:2px;padding:8px 0 7px;border:0;background:none;color:var(--muted);font-size:11.5px;font-weight:600;position:relative}
+.tab svg{width:22px;height:22px}
+.tab.on{color:var(--brand-strong)}
+.tab.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 3px 3px;background:var(--brand)}
+.tab .dot{position:absolute;top:5px;right:calc(50% - 18px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--bad);color:var(--surface);font-size:10px;line-height:16px}
+
+/* sheet + toast */
+.sheet{position:fixed;inset:0;z-index:20}
+.scrim{position:absolute;inset:0;background:var(--scrim);border:0}
+.panel{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(560px,100%);max-height:92%;overflow-y:auto;background:var(--surface);border-radius:18px 18px 0 0;padding:20px var(--gutter-r) calc(20px + env(safe-area-inset-bottom,0px)) var(--gutter-l);display:grid;gap:12px;animation:up .2s ease-out}
+.panel>.close{position:absolute;top:10px;right:max(10px,env(safe-area-inset-right,0px));width:38px;height:38px;border:0;border-radius:10px;background:var(--sunk);font-size:20px;line-height:1}
+#sheetBody{display:grid;gap:12px}
+#sheetBody>h3{padding-right:44px}
+@keyframes up{from{transform:translate(-50%,24px);opacity:.6}to{transform:translate(-50%,0);opacity:1}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));z-index:30;max-width:min(520px,calc(100% - 32px));background:var(--ink);color:var(--surface);padding:11px 16px;border-radius:12px;font-size:14px;font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+@media (prefers-reduced-motion:reduce){.panel{animation:none}.tile:active{transform:none}}
+</style>
+</head>
+<body>
+
+<header class="top"><div class="wrap-in">
+  <div class="store"><b id="storeName">StorePOS</b><span id="today"></span></div>
+  <button class="who" data-act="user" id="whoBtn"></button>
+  <button class="iconbtn" data-act="settings" aria-label="Settings and backup"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
+</div></header>
+<div class="sample" id="sampleBar"><div class="wrap-in">Sample store data. Change anything; reset or replace it in Settings.</div></div>
+<main><div class="wrap-in"><div id="view" class="view"></div></div></main>
+<nav class="tabs" aria-label="Sections"><div class="wrap-in" id="tabs"></div></nav>
+<div id="sheet" class="sheet" hidden><button class="scrim" data-act="closeSheet" aria-label="Close"></button><div class="panel" role="dialog" aria-modal="true"><button class="close" data-act="closeSheet" aria-label="Close">×</button><div id="sheetBody"></div></div></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+(function(){
+'use strict';
+var KEY='storepos-prototype-v1', DAY=864e5;
+var $=function(s){return document.querySelector(s);};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function P(c){var n=Math.round(c||0);return (n<0?'−':'')+'₱'+(Math.abs(n)/100).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function money(v){var s=String(v==null?'':v).replace(/[₱,\s]/g,'');if(!s||s==='.'||!/^\d*(\.\d{0,2})?$/.test(s))return NaN;return Math.round(parseFloat(s)*100);}
+function intv(v){var s=String(v==null?'':v).trim();if(!/^-?\d+$/.test(s))return NaN;return parseInt(s,10);}
+function sod(t){var d=new Date(t);d.setHours(0,0,0,0);return d.getTime();}
+function fTime(t){return new Date(t).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit'});}
+function fDate(t){return new Date(t).toLocaleDateString('en-PH',{month:'short',day:'numeric'});}
+function fDay(t){return new Date(t).toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});}
+function ago(t){return Math.round((sod(Date.now())-sod(t))/DAY);}
+function sum(a,f){return a.reduce(function(n,x){return n+f(x);},0);}
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---------- native bridge (Android app) ---------- */
+var NATIVE=(window.StorePOSBridge&&typeof window.StorePOSBridge.saveState==='function')?window.StorePOSBridge:null;
+var pending={},reqN=0;
+function req(cb){var id='r'+(++reqN);pending[id]=cb;return id;}
+function settle(id,val){var f=pending[id];delete pending[id];if(f){try{f(val);}catch(e){console.error(e);}}}
+window.StorePOSNative={onScan:settle,onPhoto:settle,onBackupLoaded:settle,onBackupSaved:function(ok){toast(ok?'Backup file saved.':'Backup was not saved.');}};
+var CAM='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M7.5 9v6M10.5 9v6M13.5 9v6M16.5 9v6"/></svg>';
+var PHOTO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5h3.2L8.4 6h7.2l1.7 2.5h3.2V19h-17z"/><circle cx="12" cy="13.2" r="3.4"/></svg>';
+function canScan(){return !!NATIVE||('BarcodeDetector' in window);}
+function pickImage(cb){var inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.setAttribute('capture','environment');inp.style.display='none';document.body.appendChild(inp);inp.addEventListener('change',function(){var f=inp.files&&inp.files[0];inp.remove();cb(f||null);});inp.click();}
+function scanBarcode(prompt,cb){
+  if(NATIVE){NATIVE.scan(req(function(code){if(code)cb(String(code).trim());}),prompt);return;}
+  pickImage(function(file){if(!file)return;var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){new window.BarcodeDetector().detect(img).then(function(r){URL.revokeObjectURL(url);if(r&&r.length)cb(String(r[0].rawValue).trim());else toast('No barcode found in that photo. Try closer, in good light.');}).catch(function(){toast('This browser cannot read barcodes from photos.');});};
+    img.src=url;});
+}
+function takePhoto(cb){
+  if(NATIVE){NATIVE.takePhoto(req(function(url){if(url)cb(String(url));}));return;}
+  pickImage(function(file){if(!file)return;var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){var m=360,k=Math.min(1,m/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);cb(c.toDataURL('image/jpeg',0.8));};
+    img.onerror=function(){toast('Could not read that photo.');};img.src=url;});
+}
+function dropPhoto(u){if(NATIVE&&u&&String(u).indexOf('file:')===0){try{NATIVE.deletePhoto(u);}catch(e){}}}
+function thumb(i,cls){cls=cls||'thumb';return i.photo?'<img class="'+cls+'" src="'+esc(i.photo)+'" alt="">':'<span class="'+cls+' ph" aria-hidden="true">'+esc((i.name||'?').charAt(0).toUpperCase())+'</span>';}
+
+/* ---------- sample data ---------- */
+function seed(){
+  var now=Date.now(), T=sod(now), r=rng(20261101);
+  var S={v:1,seq:1000,storeName:'Tindahan ni Rjay',userId:'u1',sample:true,
+    users:[{id:'u1',name:'Rjay',role:'owner',pin:'1234'},{id:'u2',name:'Helper',role:'helper',pin:'0000'}],
+    categories:['Drinks','Snacks','Instant food','Canned','Coffee & milk','Household','Rice & eggs','Tingi'],
+    suppliers:[{id:'s1',name:'Puregold wholesale',days:'Tue, Fri'},{id:'s2',name:'Coke delivery truck',days:'Mon'},{id:'s3',name:'Bigasan ni Mang Lito',days:'Any day'}],
+    items:[],customers:[],sales:[],moves:[],credit:[],batches:[],sessions:[],cashMoves:[],expenses:[],held:[],purchases:[]};
+  function I(id,name,barcode,cat,price,cost,stock,reorder,quick,sup,extra){var o={id:id,name:name,barcode:barcode,cat:cat,price:price,cost:cost,stock:stock,reorder:reorder,quick:quick,sup:sup,unit:'pc',parentId:'',perPack:0};for(var k in (extra||{}))o[k]=extra[k];S.items.push(o);}
+  I('i1','Oatside Matcha 200ml','8997240602878','Drinks',4000,3200,4,3,true,'s1',{unit:'bottle'});
+  I('i2','Yamyam','8888077101125','Snacks',1200,950,2,4,true,'s1');
+  I('i3','Lucky Me Pancit Canton Kalamansi','4807770270017','Instant food',1600,1350,24,12,true,'s1',{unit:'pack'});
+  I('i4','Coke Mismo 290ml','4801981116072','Drinks',2000,1650,12,12,true,'s2',{unit:'bottle'});
+  I('i5','Nescafé 3in1 Original','4800361382373','Coffee & milk',800,640,40,20,true,'s1',{unit:'sachet'});
+  I('i6','Kopiko Brown','8996001410219','Coffee & milk',800,650,6,20,true,'s1',{unit:'sachet'});
+  I('i7','Bear Brand Swak 33g','4800361002547','Coffee & milk',1400,1150,15,10,true,'s1',{unit:'sachet'});
+  I('i8','SkyFlakes 25g','4800092110040','Snacks',800,640,30,10,true,'s1',{unit:'pack'});
+  I('i9','Century Tuna Flakes 155g','748485100210','Canned',4200,3700,8,4,false,'s1',{unit:'can'});
+  I('i10','Datu Puti Vinegar 200ml','4800024554008','Household',1800,1450,6,3,false,'s1',{unit:'bottle'});
+  I('i11','Safeguard Pure White 60g','4902430733037','Household',2500,2050,5,3,false,'s1');
+  I('i12','Palmolive Shampoo sachet','8850006325735','Household',800,620,36,12,false,'s1',{unit:'sachet'});
+  I('i13','Rice, 25 kg sack','','Rice & eggs',135000,115000,1,1,false,'s3',{unit:'sack'});
+  I('i14','Rice per kilo','SS0000000014','Tingi',5200,4600,9,5,true,'s3',{unit:'kg',parentId:'i13',perPack:25});
+  I('i15','Egg tray (30)','','Rice & eggs',27000,24000,2,1,false,'s1',{unit:'tray'});
+  I('i16','Egg','SS0000000016','Tingi',900,800,14,10,true,'s1',{parentId:'i15',perPack:30});
+  I('i17','Yelo (ice)','SS0000000017','Tingi',500,150,20,10,true,'s1',{unit:'bag'});
+  I('i18','Maxx candy','4800194110011','Snacks',100,60,80,30,true,'s1');
+  S.customers=[
+    {id:'c1',name:'Aling Nena',phone:'',purok:'Purok 3',limit:50000,suki:true},
+    {id:'c2',name:'Mang Ben',phone:'',purok:'Purok 1',limit:30000,suki:false},
+    {id:'c3',name:'Kuya Jun',phone:'',purok:'Purok 2',limit:20000,suki:true}];
+  var pool=['i3','i3','i4','i4','i5','i5','i6','i8','i8','i18','i18','i17','i14','i16','i16','i1','i2','i7','i9','i12'];
+  function find(id){for(var i=0;i<S.items.length;i++)if(S.items[i].id===id)return S.items[i];}
+  for(var d=13;d>=0;d--){
+    var day=T-d*DAY, open=day+6.5*3600e3;
+    if(d===0)open=Math.min(open,now-2*3600e3);
+    S.sessions.push({id:'d'+d,openedAt:open,float:50000,closedAt:d>0?day+21.5*3600e3:null,counted:null,expected:null,user:'u1'});
+    var n=d===0?Math.max(3,Math.min(9,Math.floor((now-day)/3600e3)-6)):5+Math.floor(r()*6);
+    for(var k=0;k<n;k++){
+      var t=day+(7+Math.floor(r()*14))*3600e3+Math.floor(r()*59)*60e3;
+      if(d===0&&t>now-5*60e3)t=now-(k+1)*17*60e3;
+      if(t<open+60e3)continue;
+      var lines=[],nl=1+Math.floor(r()*3);
+      for(var j=0;j<nl;j++){
+        var it=find(pool[Math.floor(r()*pool.length)]);
+        var q=it.id==='i18'?1+Math.floor(r()*5):1+(r()<0.25?1:0);
+        var ex=null;for(var z=0;z<lines.length;z++)if(lines[z].itemId===it.id)ex=lines[z];
+        if(ex)ex.qty+=q;else lines.push({itemId:it.id,name:it.name,qty:q,price:it.price,cost:it.cost});
+      }
+      var total=sum(lines,function(l){return l.qty*l.price;}), x=r();
+      var m=x<0.72?'cash':x<0.86?'gcash':'utang';
+      var sale={id:++S.seq,t:t,lines:lines,total:total,method:m,cashIn:0,gcashIn:0,creditAmt:0,customerId:'',tendered:0,change:0,user:r()<0.8?'u1':'u2',status:'done'};
+      if(m==='cash'){var notes=[2000,5000,10000,20000,50000,100000],ten=total;for(var w=0;w<notes.length;w++)if(notes[w]>=total){ten=notes[w];break;}sale.tendered=ten;sale.change=ten-total;sale.cashIn=total;}
+      else if(m==='gcash'){sale.gcashIn=total;sale.ref=String(1000000000+Math.floor(r()*8999999999));}
+      else{sale.customerId=r()<0.65?'c1':'c2';sale.creditAmt=total;S.credit.push({id:++S.seq,t:t,customerId:sale.customerId,amount:total,saleId:sale.id,method:'',note:''});}
+      S.sales.push(sale);
+      lines.forEach(function(l){S.moves.push({id:++S.seq,t:sale.t,itemId:l.itemId,qty:-l.qty,reason:'sale',ref:sale.id,note:'',user:sale.user});});
+    }
+  }
+  function bal(cid,before){return sum(S.credit.filter(function(e){return e.customerId===cid&&e.t<before;}),function(e){return e.amount;});}
+  var p2=T-4*DAY+17*3600e3,b2=bal('c2',p2); if(b2>0)S.credit.push({id:++S.seq,t:p2,customerId:'c2',amount:-b2,saleId:0,method:'cash',note:'Bayad'});
+  var p1=T-8*DAY+18*3600e3,b1=bal('c1',p1); if(b1>2000)S.credit.push({id:++S.seq,t:p1,customerId:'c1',amount:-Math.round(b1/200)*100,saleId:0,method:'gcash',note:'Bayad'});
+  var del=T-6*DAY+10*3600e3;
+  S.purchases.push({id:++S.seq,t:del,supplierId:'s1',lines:[{itemId:'i7',qty:24,cost:1150},{itemId:'i8',qty:30,cost:640},{itemId:'i3',qty:24,cost:1350}],fee:15000,paid:true});
+  [['i7',24],['i8',30],['i3',24]].forEach(function(p){S.moves.push({id:++S.seq,t:del,itemId:p[0],qty:p[1],reason:'delivery',ref:'',note:'Puregold wholesale',user:'u1'});});
+  S.cashMoves.push({id:++S.seq,t:del,sessionId:'d6',amount:-(24*1150+30*640+24*1350+15000),reason:'Supplier',note:'Puregold wholesale'});
+  S.cashMoves.push({id:++S.seq,t:T-2*DAY+9*3600e3,sessionId:'d2',amount:-24000,reason:'Supplier',note:'Coke truck'});
+  var o0=S.sessions[S.sessions.length-1].openedAt;
+  S.cashMoves.push({id:++S.seq,t:Math.max(o0+10*60e3,Math.min(now-30*60e3,T+8*3600e3)),sessionId:'d0',amount:-4000,reason:'Fare',note:'Tricycle to the market'});
+  S.expenses.push({id:++S.seq,t:T-10*DAY,cat:'Electricity',amount:85000,note:'Meralco'});
+  S.expenses.push({id:++S.seq,t:T-3*DAY,cat:'Water',amount:18000,note:''});
+  S.expenses.push({id:++S.seq,t:T-1*DAY,cat:'Transport',amount:8000,note:'Restock trip'});
+  S.batches=[
+    {id:++S.seq,itemId:'i7',qty:15,expiry:T+9*DAY,receivedAt:del},
+    {id:++S.seq,itemId:'i2',qty:2,expiry:T+5*DAY,receivedAt:T-20*DAY},
+    {id:++S.seq,itemId:'i8',qty:30,expiry:T+40*DAY,receivedAt:del},
+    {id:++S.seq,itemId:'i16',qty:14,expiry:T+6*DAY,receivedAt:T-4*DAY},
+    {id:++S.seq,itemId:'i3',qty:24,expiry:T+120*DAY,receivedAt:del},
+    {id:++S.seq,itemId:'i1',qty:4,expiry:T+21*DAY,receivedAt:T-9*DAY}];
+  S.sales.sort(function(a,b){return a.t-b.t;});S.moves.sort(function(a,b){return a.t-b.t;});S.credit.sort(function(a,b){return a.t-b.t;});
+  var diffs=[0,0,0,-500,0,-2000,500];
+  S.sessions.forEach(function(s){if(s.closedAt){var e=drawerOf(S,s).expected;s.expected=e;s.counted=e+diffs[Math.floor(r()*diffs.length)];}});
+  return S;
+}
+
+function freshStore(legacy){
+  var F={v:1,seq:1000,storeName:'My Sari-Sari Store',userId:'u1',sample:false,
+    users:[{id:'u1',name:'Owner',role:'owner',pin:'1234'},{id:'u2',name:'Helper',role:'helper',pin:'0000'}],
+    categories:['Drinks','Snacks','Instant food','Canned','Coffee & milk','Household','Rice & eggs','Tingi','Other'],
+    suppliers:[{id:'s1',name:'Main supplier',days:''}],
+    items:[],customers:[],sales:[],moves:[],credit:[],batches:[],sessions:[],cashMoves:[],expenses:[],held:[],purchases:[]};
+  (legacy||[]).forEach(function(l,ix){if(!l||!l.name)return;var id='i'+(++F.seq),st=Math.max(0,parseInt(l.stock,10)||0);
+    F.items.push({id:id,name:String(l.name),barcode:String(l.barcode||''),cat:'Other',price:Math.max(0,parseInt(l.price,10)||0),cost:0,stock:st,reorder:3,quick:ix<12,sup:'s1',unit:'pc',parentId:'',perPack:0,photo:''});
+    if(st)F.moves.push({id:++F.seq,t:Date.now(),itemId:id,qty:st,reason:'opening',ref:'',note:'From StorePOS 1.x',user:'u1'});});
+  return F;
+}
+function normalize(st){st.items.forEach(function(i){if(!(i.stock>=0))i.stock=0;if(i.photo==null)i.photo='';});['customers','sales','moves','credit','batches','sessions','cashMoves','expenses','held','purchases','suppliers'].forEach(function(k){if(!Array.isArray(st[k]))st[k]=[];});return st;}
+
+/* ---------- state ---------- */
+var S=null;
+try{var raw=NATIVE?NATIVE.loadState():localStorage.getItem(KEY);S=raw?JSON.parse(raw):null;}catch(e){S=null;}
+if(!S||S.v!==1||!Array.isArray(S.items)){if(NATIVE){var leg=[];try{leg=JSON.parse(NATIVE.legacyItems()||'[]');}catch(e){}S=freshStore(leg);}else S=seed();}
+normalize(S);
+function save(){var j=JSON.stringify(S);if(NATIVE){try{NATIVE.saveState(j);}catch(e){toast('Could not save: '+e);}return;}try{localStorage.setItem(KEY,j);}catch(e){}}
+var ui={tab:'sell',cart:[],pay:{},itemQ:'',itemCat:'All',stockSeg:'low',range:'today',recv:null,adj:{itemId:'',type:'waste',qty:'',counted:'',note:''},pin:'',pinUser:'',edit:null,afterCustomer:null};
+try{var tb=localStorage.getItem(KEY+':tab');if(tb)ui.tab=tb;}catch(e){}
+
+function item(id){for(var i=0;i<S.items.length;i++)if(S.items[i].id===id)return S.items[i];return null;}
+function cust(id){for(var i=0;i<S.customers.length;i++)if(S.customers[i].id===id)return S.customers[i];return null;}
+function sup(id){for(var i=0;i<S.suppliers.length;i++)if(S.suppliers[i].id===id)return S.suppliers[i];return null;}
+function me(){for(var i=0;i<S.users.length;i++)if(S.users[i].id===S.userId)return S.users[i];return S.users[0];}
+function owner(){return me().role==='owner';}
+function openSession(){for(var i=0;i<S.sessions.length;i++)if(!S.sessions[i].closedAt)return S.sessions[i];return null;}
+function balance(cid){return sum(S.credit.filter(function(e){return e.customerId===cid;}),function(e){return e.amount;});}
+function oldestUnpaid(cid){
+  var es=S.credit.filter(function(e){return e.customerId===cid;}).sort(function(a,b){return a.t-b.t;});
+  var paid=sum(es.filter(function(e){return e.amount<0;}),function(e){return -e.amount;});
+  for(var i=0;i<es.length;i++){var e=es[i];if(e.amount<=0)continue;if(paid>=e.amount){paid-=e.amount;continue;}return e.t;}
+  return null;
+}
+function drawerOf(st,s){
+  var a=s.openedAt,b=s.closedAt||Date.now()+1;
+  function inR(t){return t>=a&&t<b;}
+  var live=st.sales.filter(function(x){return x.status==='done'&&inR(x.t);});
+  var cashSales=sum(live,function(x){return x.cashIn;});
+  var bayad=sum(st.credit.filter(function(e){return e.amount<0&&e.method==='cash'&&inR(e.t);}),function(e){return -e.amount;});
+  var mv=st.cashMoves.filter(function(m){return m.sessionId===s.id;});
+  var out=sum(mv.filter(function(m){return m.amount<0;}),function(m){return -m.amount;});
+  var inn=sum(mv.filter(function(m){return m.amount>0;}),function(m){return m.amount;});
+  var gcash=sum(live,function(x){return x.gcashIn;})+sum(st.credit.filter(function(e){return e.amount<0&&e.method==='gcash'&&inR(e.t);}),function(e){return -e.amount;});
+  return {float:s.float,cashSales:cashSales,bayad:bayad,out:out,inn:inn,gcash:gcash,expected:s.float+cashSales+bayad+inn-out};
+}
+function move(itemId,qty,reason,ref,note){
+  var it=item(itemId);if(!it||!qty)return;
+  it.stock=Math.max(0,it.stock+qty);
+  S.moves.push({id:++S.seq,t:Date.now(),itemId:itemId,qty:qty,reason:reason,ref:ref||'',note:note||'',user:S.userId});
+  if(qty<0){var q=-qty;S.batches.filter(function(b){return b.itemId===itemId&&b.qty>0;}).sort(function(a,b){return a.expiry-b.expiry;}).forEach(function(b){if(q<=0)return;var k=Math.min(b.qty,q);b.qty-=k;q-=k;});}
+}
+function cartTotal(){return sum(ui.cart,function(l){return l.qty*l.price;});}
+var REASON={sale:'Sold',delivery:'Delivery',waste:'Spoiled or damaged',draw:'Taken for the house',count:'Shelf count',repack:'Opened a pack',void:'Returned from void',opening:'Starting stock'};
+
+/* ---------- shell ---------- */
+var ICONS={
+  sell:'<path d="M3 4h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/>',
+  items:'<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8" r="1.4"/>',
+  stock:'<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+  utang:'<path d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><path d="M6 3v18M3.5 7H6M3.5 12H6M3.5 17H6M10 8h6M10 12h6"/>',
+  money:'<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
+  reports:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>'};
+var TABS=[['sell','Sell'],['items','Items'],['stock','Stock'],['utang','Utang'],['money','Money'],['reports','Reports']];
+function renderShell(){
+  $('#storeName').textContent=S.storeName;
+  $('#today').textContent=new Date().toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric'});
+  var u=me(),rl=u.role==='owner'?'Owner':'Helper';$('#whoBtn').innerHTML=esc(u.name)+(u.name===rl?'':' <i>· '+rl+'</i>');
+  $('#sampleBar').hidden=!S.sample;
+  var lowN=S.items.filter(function(i){return i.stock<=i.reorder;}).length;
+  $('#tabs').innerHTML=TABS.map(function(t){
+    var dot=(t[0]==='stock'&&lowN)?'<span class="dot">'+lowN+'</span>':'';
+    return '<button class="tab'+(ui.tab===t[0]?' on':'')+'" data-act="tab" data-t="'+t[0]+'"'+(ui.tab===t[0]?' aria-current="page"':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[t[0]]+'</svg>'+t[1]+dot+'</button>';}).join('');
+}
+function render(){
+  renderShell();
+  var v=$('#view');v.innerHTML=VIEWS[ui.tab]();
+  if(ui.tab==='sell')bindSell();
+}
+function toast(msg){var t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(function(){t.hidden=true;},2800);}
+function showSheet(html){$('#sheetBody').innerHTML=html;$('#sheet').hidden=false;document.body.classList.add('locked');var f=$('#sheetBody').querySelector('[data-autofocus]');if(f&&window.matchMedia&&matchMedia('(pointer:fine)').matches)f.focus();}
+function closeSheet(){$('#sheet').hidden=true;document.body.classList.remove('locked');}
+function empty(msg){return '<p class="empty">'+msg+'</p>';}
+
+/* ---------- SELL ---------- */
+function viewSell(){
+  var quick=S.items.filter(function(i){return i.quick;});
+  var total=cartTotal(), count=sum(ui.cart,function(l){return l.qty;});
+  var h='<div class="row"><label class="sr" for="scan">Scan a barcode or search by name</label><input id="scan" class="input big" placeholder="Scan barcode or type a name" autocomplete="off" enterkeyhint="go">'+(canScan()?'<button class="btn primary sq" data-act="camScan" aria-label="Scan with camera" style="min-height:52px">'+CAM+'</button>':'')+'</div><div id="suggest" class="suggest" hidden></div>';
+  if(!openSession())h+='<p class="flag warn" style="margin:0">The day is not open yet. Cash sales still save, but open the day in Money to track the drawer.</p>';
+  if(S.held.length)h+='<div class="held"><span class="lbl">On hold</span>'+S.held.map(function(x){return '<button class="chip" data-act="resume" data-id="'+x.id+'">'+esc(x.note)+' · '+P(x.total)+'</button>';}).join('')+'</div>';
+  h+='<h2 class="sec">Quick tap <span class="muted">'+quick.length+' items</span></h2>'+(quick.length?'':'<div class="card">'+empty('No Quick tap items yet. In Items, open an item and turn on “Show on the Quick tap grid”.')+'</div>')+'<div class="grid">'+quick.map(function(i){
+    var cls=i.stock<=0?' out':i.stock<=i.reorder?' low':'';
+    return '<button class="tile'+cls+'" data-act="add" data-id="'+i.id+'">'+(i.photo?'<img class="timg" src="'+esc(i.photo)+'" alt="">':'')+'<span class="tname">'+esc(i.name)+'</span><span class="tprice">'+P(i.price)+'</span><span class="tstock">'+i.stock+' left</span></button>';}).join('')+'</div>';
+  h+='<h2 class="sec">This sale <span class="muted">'+count+' item'+(count===1?'':'s')+'</span></h2>';
+  h+='<div class="tapewrap"><div class="tape">'+(ui.cart.length?ui.cart.map(cartLine).join('')+'<div class="tape-total"><span>Total</span><strong>'+P(total)+'</strong></div>':empty('Tap an item or scan a barcode to start a sale.'))+'</div></div>';
+  h+='<div class="sticky-pay"><div class="actions"><button class="btn ghost" data-act="hold"'+(ui.cart.length?'':' disabled')+'>Hold</button><button class="btn ghost" data-act="clearCart"'+(ui.cart.length?'':' disabled')+'>Clear</button><button class="btn primary grow" data-act="pay"'+(ui.cart.length?'':' disabled')+'>Pay '+P(total)+'</button></div></div>';
+  return h;
+}
+function cartLine(l,ix){
+  var it=item(l.itemId), inCart=sum(ui.cart.filter(function(c){return c.itemId===l.itemId;}),function(c){return c.qty;});
+  var short=it&&it.stock-inCart<0, changed=it&&l.price!==it.price;
+  return '<div class="line"><div><div class="lname">'+esc(l.name)+'</div><button class="lprice" data-act="editPrice" data-ix="'+ix+'">'+P(l.price)+' each'+(changed?' · changed':'')+'</button>'+(short?'<br><span class="flag warn">Stock says '+it.stock+'. Check the shelf.</span>':'')+'</div>'+
+    '<div class="stepper"><button data-act="qty" data-ix="'+ix+'" data-d="-1" aria-label="One less '+esc(l.name)+'">−</button><span>'+l.qty+'</span><button data-act="qty" data-ix="'+ix+'" data-d="1" aria-label="One more '+esc(l.name)+'">+</button></div>'+
+    '<div class="lsum">'+P(l.qty*l.price)+'</div></div>';
+}
+function matches(q){q=q.trim().toLowerCase();if(!q)return [];return S.items.filter(function(i){return i.name.toLowerCase().indexOf(q)>=0||(i.barcode||'').toLowerCase().indexOf(q)>=0;}).slice(0,6);}
+function bindSell(){
+  var inp=$('#scan');if(!inp)return;
+  if(ui.focusScan){inp.focus();ui.focusScan=false;}
+  inp.addEventListener('input',function(){
+    var ms=matches(inp.value),box=$('#suggest');
+    if(!inp.value.trim()){box.hidden=true;return;}
+    box.hidden=false;
+    box.innerHTML=ms.length?ms.map(function(i){return '<button data-act="add" data-id="'+i.id+'" data-from="search"><span class="sugl">'+thumb(i)+'<span>'+esc(i.name)+'<br><small class="muted">'+esc(i.barcode||'no barcode')+' · '+i.stock+' left</small></span></span><span class="num">'+P(i.price)+'</span></button>';}).join(''):'<button data-act="registerNew" data-code="'+esc(inp.value.trim())+'"><span>No item found. Register “'+esc(inp.value.trim())+'”</span><span>→</span></button>';
+  });
+  inp.addEventListener('keydown',function(e){
+    if(e.key!=='Enter')return;e.preventDefault();
+    var q=inp.value.trim();if(!q)return;
+    var exact=S.items.filter(function(i){return i.barcode&&i.barcode===q;})[0];
+    var ms=matches(q);
+    if(exact)addToCart(exact.id,true);
+    else if(ms.length===1)addToCart(ms[0].id,true);
+    else if(!ms.length){unknownCode(q);}
+  });
+}
+function addToCart(id,keepFocus){
+  var it=item(id);if(!it)return;
+  var l=ui.cart.filter(function(c){return c.itemId===id&&c.price===it.price;})[0];
+  if(l)l.qty++;else ui.cart.push({itemId:id,name:it.name,qty:1,price:it.price,cost:it.cost});
+  ui.focusScan=!!keepFocus;render();
+}
+
+function unknownCode(code){showSheet('<h3>New barcode</h3><p class="note">No item has barcode <span class="mono">'+esc(code)+'</span> yet.</p><button class="btn primary wide" data-act="registerNew" data-code="'+esc(code)+'">Register this item</button>');}
+
+/* pay */
+function payBody(){
+  var total=cartTotal(),m=ui.pay.method;
+  if(m==='cash'){
+    var q=[total];[2000,5000,10000,20000,50000,100000].forEach(function(v){if(v>total&&q.length<5)q.push(v);});
+    return '<label class="fl" for="tendered">Cash received</label><input id="tendered" class="input money big" inputmode="decimal" placeholder="0.00" value="'+esc(ui.pay.tendered)+'" data-autofocus>'+
+      '<div class="chips">'+q.map(function(v,i){return '<button class="chip" data-act="tender" data-v="'+v+'">'+(i===0?'Exact':P(v))+'</button>';}).join('')+'</div>'+
+      '<div class="sukli" id="sukliBox">'+sukliHTML()+'</div><button class="btn primary wide" data-act="complete">Complete sale</button>';
+  }
+  if(m==='gcash')return '<p class="note">Check the customer\'s GCash or Maya screen shows '+P(total)+' sent to you before completing.</p><label class="fl" for="gref">Reference number (optional)</label><input id="gref" class="input" inputmode="numeric" value="'+esc(ui.pay.ref)+'"><button class="btn primary wide" data-act="complete">Complete sale</button>';
+  return '<label class="fl" for="ucust">Charge to</label><select id="ucust" class="input"><option value="">Choose a customer…</option>'+S.customers.map(function(c){return '<option value="'+c.id+'"'+(c.id===ui.pay.customerId?' selected':'')+'>'+esc(c.name)+' (owes '+P(balance(c.id))+')</option>';}).join('')+'</select>'+
+    '<button class="link" data-act="newCustomer" data-from="pay">+ New customer</button>'+
+    '<label class="fl" for="cashNow">Paid now in cash (optional)</label><input id="cashNow" class="input money" inputmode="decimal" placeholder="0.00" value="'+esc(ui.pay.cashNow)+'">'+
+    '<div id="utangInfo">'+utangInfoHTML()+'</div><button class="btn primary wide" data-act="complete">Add to utang</button>';
+}
+function sukliHTML(){
+  var total=cartTotal(),t=money(ui.pay.tendered);
+  if(!isFinite(t))return '<span class="lbl">Sukli</span><strong>—</strong>';
+  if(t<total)return '<span class="lbl">Short by</span><strong class="bad">'+P(total-t)+'</strong>';
+  return '<span class="lbl">Sukli</span><strong>'+P(t-total)+'</strong>';
+}
+function utangInfoHTML(){
+  var c=cust(ui.pay.customerId);if(!c)return '';
+  var total=cartTotal(),n=money(ui.pay.cashNow),cn=isFinite(n)?Math.min(n,total):0,nb=balance(c.id)+total-cn;
+  return '<div class="kv"><span>New balance</span><strong>'+P(nb)+'</strong></div>'+(c.limit&&nb>c.limit?'<p class="flag bad">This puts '+esc(c.name)+' over the '+P(c.limit)+' limit. You can still continue.</p>':'');
+}
+function paySheet(){
+  var m=ui.pay.method;
+  return '<h3>Pay '+P(cartTotal())+'</h3><div class="seg" role="group" aria-label="Payment method">'+[['cash','Cash'],['gcash','GCash / Maya'],['utang','Utang']].map(function(o){return '<button class="'+(m===o[0]?'on':'')+'" aria-pressed="'+(m===o[0])+'" data-act="payMethod" data-m="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div><div id="payBody" style="display:grid;gap:10px">'+payBody()+'</div>';
+}
+function completeSale(){
+  var total=cartTotal(),m=ui.pay.method;
+  var sale={id:++S.seq,t:Date.now(),lines:ui.cart.map(function(l){return {itemId:l.itemId,name:l.name,qty:l.qty,price:l.price,cost:l.cost};}),total:total,method:m,cashIn:0,gcashIn:0,creditAmt:0,customerId:'',tendered:0,change:0,user:S.userId,status:'done'};
+  if(m==='cash'){var t=money(ui.pay.tendered);if(!(t>=total)){S.seq--;toast('Enter the cash received. It must be at least '+P(total)+'.');return;}sale.tendered=t;sale.change=t-total;sale.cashIn=total;}
+  else if(m==='gcash'){sale.gcashIn=total;sale.ref=(ui.pay.ref||'').trim();}
+  else{var c=cust(ui.pay.customerId);if(!c){S.seq--;toast('Choose who this utang is for.');return;}
+    var n=money(ui.pay.cashNow),cn=isFinite(n)?Math.min(n,total):0;sale.cashIn=cn;sale.creditAmt=total-cn;sale.customerId=c.id;
+    if(sale.creditAmt>0)S.credit.push({id:++S.seq,t:sale.t,customerId:c.id,amount:sale.creditAmt,saleId:sale.id,method:'',note:''});}
+  S.sales.push(sale);
+  sale.lines.forEach(function(l){move(l.itemId,-l.qty,'sale',sale.id);});
+  ui.cart=[];save();render();showSheet(resultSheet(sale));
+}
+function receiptHTML(s){
+  return '<div class="receipt">'+s.lines.map(function(l){return '<div><span>'+l.qty+' × '+esc(l.name)+'</span><span>'+P(l.qty*l.price)+'</span></div>';}).join('')+'<div class="tot"><span>Total</span><span>'+P(s.total)+'</span></div>'+
+    (s.method==='cash'?'<div><span>Cash</span><span>'+P(s.tendered)+'</span></div><div><span>Sukli</span><span>'+P(s.change)+'</span></div>':'')+
+    (s.method==='gcash'?'<div><span>GCash / Maya'+(s.ref?' · '+esc(s.ref):'')+'</span><span>'+P(s.gcashIn)+'</span></div>':'')+
+    (s.method==='utang'?(s.cashIn?'<div><span>Cash now</span><span>'+P(s.cashIn)+'</span></div>':'')+'<div><span>Utang · '+esc((cust(s.customerId)||{}).name)+'</span><span>'+P(s.creditAmt)+'</span></div>':'')+
+    '<div class="muted"><span>#'+s.id+' · '+fDay(s.t)+' '+fTime(s.t)+'</span><span>'+esc((S.users.filter(function(u){return u.id===s.user;})[0]||{}).name||'')+'</span></div></div>';
+}
+function resultSheet(s){
+  var head;
+  if(s.method==='cash')head='<div class="result"><span class="lbl">Sukli</span><strong>'+P(s.change)+'</strong><span class="muted">from '+P(s.tendered)+'</span></div>';
+  else if(s.method==='gcash')head='<div class="result"><span class="lbl">Paid by GCash / Maya</span><strong>'+P(s.total)+'</strong></div>';
+  else{var c=cust(s.customerId);head='<div class="result"><span class="lbl">Added to utang</span><strong>'+P(s.creditAmt)+'</strong><span class="muted">'+esc(c.name)+' now owes '+P(balance(c.id))+'</span></div>';}
+  return '<h3>Sale saved</h3>'+head+receiptHTML(s)+(s.cashIn&&!openSession()?'<p class="flag warn">The day is not open, so this cash is not counted in a drawer yet.</p>':'')+'<button class="btn primary wide" data-act="nextCustomer" data-autofocus>Next customer</button>';
+}
+
+/* ---------- ITEMS ---------- */
+function viewItems(){
+  return '<div class="actions"><button class="btn ghost grow" data-act="priceCheck">'+CAM+'Check price</button><button class="btn primary grow" data-act="editItem" data-id="">Add item</button></div><div><label class="sr" for="itemQ">Search items</label><input id="itemQ" class="input" placeholder="Search name or barcode" autocomplete="off" value="'+esc(ui.itemQ)+'"></div>'+
+    '<div class="chips scroll">'+['All'].concat(S.categories).map(function(c){return '<button class="chip'+(ui.itemCat===c?' on':'')+'" data-act="itemCat" data-c="'+esc(c)+'">'+esc(c)+'</button>';}).join('')+'</div><div id="itemList">'+itemListHTML()+'</div>';
+}
+function itemListHTML(){
+  var q=ui.itemQ.trim().toLowerCase();
+  var list=S.items.filter(function(i){return (ui.itemCat==='All'||i.cat===ui.itemCat)&&(!q||i.name.toLowerCase().indexOf(q)>=0||(i.barcode||'').indexOf(q)>=0);}).sort(function(a,b){return a.name.localeCompare(b.name);});
+  if(!list.length)return '<div class="list">'+empty(S.items.length?'No items match.':'No items yet. Tap Add item, then scan its barcode.'+(q?' <button class="link" data-act="editItem" data-id="" data-code="'+esc(ui.itemQ.trim())+'">Add “'+esc(ui.itemQ.trim())+'”</button>':''))+'</div>';
+  return '<ul class="list">'+list.map(function(i){
+    var pct=i.price?(i.price-i.cost)/i.price*100:0, p=i.parentId?item(i.parentId):null;
+    return '<li><button class="rowbtn" data-act="editItem" data-id="'+i.id+'">'+thumb(i)+'<span class="rmain"><span class="rname">'+esc(i.name)+'</span><span class="rmeta">'+esc(i.barcode||'No barcode')+' · '+esc(i.cat)+(p?' · tingi from '+esc(p.name):'')+'</span></span>'+
+      '<span class="rside"><span class="rprice">'+P(i.price)+'</span>'+(owner()?'<span class="rmargin'+(pct<10?' bad':'')+'">'+(i.cost?pct.toFixed(0)+'% margin':'no cost yet')+'</span>':'')+'<span class="pill'+(i.stock<=0?' bad':i.stock<=i.reorder?' warn':'')+'">'+i.stock+' '+esc(i.unit)+'</span></span></button></li>';}).join('')+'</ul>';
+}
+function marginLine(price,cost,unit){
+  if(!isFinite(price)||price<=0)return 'Enter a selling price.';
+  if(!isFinite(cost)||cost<=0)return 'Add a cost price to see your margin.';
+  var m=price-cost,pct=m/price*100;
+  if(m<0)return '<span class="bad">Selling below cost: you lose '+P(-m)+' on each one.</span>';
+  return 'Margin '+P(m)+' per '+esc(unit||'pc')+' ('+pct.toFixed(1)+'%)'+(pct<10?' <span class="pill warn">Thin</span>':'');
+}
+function itemSheet(id,code){
+  var it=id?item(id):{id:'',name:'',barcode:code||'',cat:S.categories[0],price:0,cost:0,stock:0,reorder:5,quick:true,sup:(S.suppliers[0]||{}).id||'',unit:'pc',parentId:'',perPack:0,photo:''};
+  ui.edit=it.id;ui.editPhoto=it.photo||'';
+  var units=['pc','pack','sachet','bottle','can','kg','sack','tray','bag'];if(units.indexOf(it.unit)<0)units.push(it.unit);
+  return '<h3>'+(id?'Edit item':'New item')+'</h3><div class="form"><div id="photoRow" class="photorow">'+photoRowHTML()+'</div>'+
+   '<label class="fl" for="f_name">Name</label><input id="f_name" class="input" value="'+esc(it.name)+'" data-autofocus>'+
+   '<label class="fl" for="f_barcode">Barcode</label><div class="row"><input id="f_barcode" class="input" value="'+esc(it.barcode)+'">'+(canScan()?'<button class="btn ghost sq" data-act="scanInto" aria-label="Scan barcode with camera">'+CAM+'</button>':'')+'<button class="btn ghost" data-act="genCode">Make code</button></div>'+
+   '<div class="two"><div><label class="fl" for="f_cat">Category</label><select id="f_cat" class="input">'+S.categories.map(function(c){return '<option'+(c===it.cat?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></div>'+
+   '<div><label class="fl" for="f_unit">Sold by</label><select id="f_unit" class="input">'+units.map(function(u){return '<option'+(u===it.unit?' selected':'')+'>'+u+'</option>';}).join('')+'</select></div></div>'+
+   '<div class="two"><div><label class="fl" for="f_price">Selling price (₱)</label><input id="f_price" class="input money" inputmode="decimal" value="'+(it.price?(it.price/100).toFixed(2):'')+'"></div>'+
+   (owner()?'<div><label class="fl" for="f_cost">Cost price (₱)</label><input id="f_cost" class="input money" inputmode="decimal" value="'+(it.cost?(it.cost/100).toFixed(2):'')+'"></div>':'<div></div>')+'</div>'+
+   (owner()?'<p id="marginLine" class="note">'+marginLine(it.price,it.cost,it.unit)+'</p>':'')+
+   '<div class="two"><div><label class="fl" for="f_stock">'+(id?'Stock on hand':'Starting stock')+'</label><input id="f_stock" class="input" inputmode="numeric" value="'+it.stock+'"'+(id?' readonly':'')+'></div>'+
+   '<div><label class="fl" for="f_reorder">Reorder when at</label><input id="f_reorder" class="input" inputmode="numeric" value="'+it.reorder+'"></div></div>'+
+   (id?'<p class="note">To change stock, use Stock → Adjust, so the change is logged with a reason.</p>':'')+
+   '<label class="fl" for="f_sup">Usual supplier</label><select id="f_sup" class="input">'+S.suppliers.map(function(s){return '<option value="'+s.id+'"'+(s.id===it.sup?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select>'+
+   '<label class="check"><input type="checkbox" id="f_quick"'+(it.quick?' checked':'')+'> Show on the Quick tap grid</label>'+
+   '<fieldset class="box"><legend>Tingi: sold per piece from a pack</legend><label class="fl" for="f_parent">Opened from</label><select id="f_parent" class="input"><option value="">Not tingi</option>'+S.items.filter(function(x){return x.id!==it.id&&!x.parentId;}).map(function(x){return '<option value="'+x.id+'"'+(x.id===it.parentId?' selected':'')+'>'+esc(x.name)+'</option>';}).join('')+'</select>'+
+   '<label class="fl" for="f_per">Pieces per pack</label><input id="f_per" class="input" inputmode="numeric" placeholder="e.g. 25" value="'+(it.perPack||'')+'"></fieldset>'+
+   '<p id="itemErr" class="flag bad" hidden></p><div class="actions"><button class="btn primary grow" data-act="saveItem">Save item</button>'+(id&&owner()?'<button class="btn danger" data-act="askDelete">Delete</button>':'')+'</div><div id="delConfirm"></div></div>';
+}
+function saveItem(){
+  var id=ui.edit, it=id?item(id):null;
+  function v(x){var e=$('#'+x);return e?e.value:'';}
+  function err(m){var e=$('#itemErr');e.textContent=m;e.hidden=false;}
+  var name=v('f_name').trim(), code=v('f_barcode').trim(), price=money(v('f_price')), cost=owner()?money(v('f_cost')):(it?it.cost:0);
+  var reorder=intv(v('f_reorder')), stock=id?it.stock:intv(v('f_stock')||'0'), parent=v('f_parent'), per=intv(v('f_per')||'0');
+  if(!name)return err('Enter the item name.');
+  if(!isFinite(price)||price<=0)return err('Enter a selling price, like 16 or 16.50.');
+  if(owner()&&v('f_cost').trim()&&!isFinite(cost))return err('Cost price should look like 13.50.');
+  if(!isFinite(cost))cost=0;
+  if(!isFinite(reorder)||reorder<0)return err('Reorder level should be a whole number.');
+  if(!isFinite(stock))return err('Starting stock should be a whole number.');
+  if(code&&S.items.some(function(x){return x.barcode===code&&x.id!==id;}))return err('Another item already uses barcode '+code+'.');
+  if(parent&&(!isFinite(per)||per<1))return err('Enter how many pieces come in one pack.');
+  var data={name:name,barcode:code,cat:v('f_cat'),unit:v('f_unit'),price:price,cost:cost,reorder:reorder,sup:v('f_sup'),quick:$('#f_quick').checked,parentId:parent,perPack:parent?per:0,photo:ui.editPhoto||''};
+  if(it&&it.photo&&it.photo!==data.photo)dropPhoto(it.photo);
+  if(it){for(var k in data)it[k]=data[k];toast('Saved '+name);}
+  else{var nid='i'+(++S.seq);data.id=nid;data.stock=0;S.items.push(data);if(stock)move(nid,stock,'opening');toast('Added '+name+' at '+P(price));}
+  save();closeSheet();render();
+}
+
+function photoRowHTML(){var p=ui.editPhoto;return (p?'<img class="photobox" src="'+esc(p)+'" alt="Item photo">':'<span class="photobox">No photo</span>')+'<div class="photobtns"><button class="btn ghost" data-act="itemPhoto">'+PHOTO+(p?'Retake photo':'Take photo')+'</button>'+(p?'<button class="link" data-act="itemPhotoRemove">Remove photo</button>':'')+'</div>';}
+function priceSheet(){return '<h3>Check price</h3>'+(canScan()?'<button class="btn primary wide" data-act="pcScan">'+CAM+'Scan with camera</button>':'')+'<label class="fl" for="pc_q">'+(canScan()?'Or type':'Type')+' a name or barcode</label><input id="pc_q" class="input" autocomplete="off" data-autofocus><div id="pcList"></div><div id="pcResult"></div>';}
+function pcResultHTML(i){return '<div class="pcres">'+(i.photo?'<img src="'+esc(i.photo)+'" alt="">':'<span class="ph" aria-hidden="true">'+esc(i.name.charAt(0).toUpperCase())+'</span>')+'<div class="rname" style="font-size:18px">'+esc(i.name)+'</div><div class="pcprice">'+P(i.price)+'</div><div class="rmeta">'+i.stock+' '+esc(i.unit)+' left · '+esc(i.barcode||'no barcode')+'</div><div class="actions"><button class="btn ghost grow" data-act="editItem" data-id="'+i.id+'">Edit item</button><button class="btn primary grow" data-act="pcAdd" data-id="'+i.id+'">Add to sale</button></div></div>';}
+
+/* ---------- STOCK ---------- */
+function suggestQty(i){return Math.max(1,i.reorder*2-i.stock);}
+var STOCK={
+  low:function(){
+    var lows=S.items.filter(function(i){return i.stock<=i.reorder;});
+    if(!lows.length)return empty('Everything is above its reorder level.');
+    var tingi=lows.filter(function(i){return i.parentId;}), buy=lows.filter(function(i){return !i.parentId;}), by={};
+    buy.forEach(function(i){(by[i.sup]=by[i.sup]||[]).push(i);});
+    var h='<p class="note">Suggested amounts bring each item back to twice its reorder level.</p>';
+    Object.keys(by).forEach(function(sid){var s=sup(sid)||{name:'No supplier',days:''};
+      h+='<div class="card"><div class="cardhead"><h3>'+esc(s.name)+'</h3><span class="muted">'+esc(s.days||'')+'</span></div><div class="tblwrap"><table class="tbl"><thead><tr><th>Item</th><th class="n">Left</th><th class="n">Reorder at</th><th class="n">Buy</th></tr></thead><tbody>'+
+      by[sid].map(function(i){return '<tr><td>'+esc(i.name)+'</td><td class="n '+(i.stock<=0?'bad':'warn')+'">'+i.stock+'</td><td class="n">'+i.reorder+'</td><td class="n strong">'+suggestQty(i)+'</td></tr>';}).join('')+
+      '</tbody></table></div><button class="btn ghost wide" data-act="receiveFrom" data-s="'+sid+'">Receive this delivery</button></div>';});
+    if(tingi.length)h+='<div class="card"><div class="cardhead"><h3>Open a pack</h3><span class="muted">Tingi items</span></div>'+tingi.map(function(i){var p=item(i.parentId);return '<div class="kv"><span>'+esc(i.name)+' <span class="pill warn">'+i.stock+' left</span></span><span class="muted">'+(p?p.stock+' '+esc(p.unit)+' in stock':'')+'</span></div>';}).join('')+'<button class="btn ghost wide" data-act="stockSeg" data-s="repack">Go to Repack</button></div>';
+    return h;
+  },
+  receive:function(){
+    if(!ui.recv)ui.recv={supplierId:S.suppliers[0].id,lines:[{itemId:'',qty:'',cost:'',expiry:''}],fee:'',paid:true};
+    var R=ui.recv;
+    return '<div class="card"><label class="fl" for="r_sup">Supplier</label><select id="r_sup" class="input">'+S.suppliers.map(function(s){return '<option value="'+s.id+'"'+(s.id===R.supplierId?' selected':'')+'>'+esc(s.name)+'</option>';}).join('')+'</select>'+
+      '<div id="r_lines">'+R.lines.map(recvLine).join('')+'</div><button class="link" data-act="recvAdd">+ Add another item</button>'+
+      '<div class="two"><div><label class="fl" for="r_fee">Delivery or fare (₱)</label><input id="r_fee" class="input money" inputmode="decimal" placeholder="0.00" value="'+esc(R.fee)+'"></div><div class="totals" id="r_total">'+recvTotalHTML()+'</div></div>'+
+      '<label class="check"><input type="checkbox" id="r_paid"'+(R.paid?' checked':'')+'> Paid from today\'s drawer</label>'+
+      '<p class="note">The fare is spread across the items by value, so each cost price shows what it really cost you.</p><button class="btn primary wide" data-act="recvSave">Receive into stock</button></div>';
+  },
+  adjust:function(){
+    var A=ui.adj,it=item(A.itemId);
+    return '<div class="card"><label class="fl" for="a_item">Item</label><select id="a_item" class="input"><option value="">Choose an item…</option>'+S.items.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(i){return '<option value="'+i.id+'"'+(i.id===A.itemId?' selected':'')+'>'+esc(i.name)+' ('+i.stock+')</option>';}).join('')+'</select>'+
+      '<div class="seg small wrap">'+[['waste','Spoiled'],['draw','For the house'],['count','Shelf count']].map(function(o){return '<button class="'+(A.type===o[0]?'on':'')+'" aria-pressed="'+(A.type===o[0])+'" data-act="adjType" data-t="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>'+
+      (A.type==='count'?'<label class="fl" for="a_counted">Counted on the shelf</label><input id="a_counted" class="input" inputmode="numeric" value="'+esc(A.counted)+'"><p class="note" id="a_diff">'+adjDiff()+'</p>':'<label class="fl" for="a_qty">How many</label><input id="a_qty" class="input" inputmode="numeric" value="'+esc(A.qty)+'">')+
+      '<label class="fl" for="a_note">Note (optional)</label><input id="a_note" class="input" value="'+esc(A.note)+'">'+
+      (A.type==='draw'?'<p class="note">Recorded at cost'+(it?' ('+P(it.cost)+' each)':'')+', so stock and profit stay accurate. Taking goods home is normal; not recording it is what makes a store look like it is losing money.</p>':'')+
+      (A.type==='waste'?'<p class="note">Spoiled, broken or expired goods. Recorded so missing stock is explained.</p>':'')+
+      '<button class="btn primary wide" data-act="adjSave">Save</button></div>';
+  },
+  repack:function(){
+    var kids=S.items.filter(function(i){return i.parentId&&i.perPack>0;});
+    if(!kids.length)return empty('No tingi items yet. In Items, set “Opened from” on an item you sell per piece.');
+    return kids.map(function(k){var p=item(k.parentId);if(!p)return '';
+      return '<div class="card repack"><div><div class="rname">'+esc(p.name)+'</div><div class="rmeta">'+p.stock+' '+esc(p.unit)+' in stock</div></div><div class="arrow">→<br>'+k.perPack+' ×</div><div><div class="rname">'+esc(k.name)+'</div><div class="rmeta">'+k.stock+' '+esc(k.unit)+' on hand</div></div>'+
+      '<button class="btn primary" data-act="openPack" data-id="'+k.id+'"'+(p.stock<1?' disabled':'')+'>Open 1 '+esc(p.unit)+'</button></div>';}).join('');
+  },
+  expiry:function(){
+    var bs=S.batches.filter(function(b){return b.qty>0&&b.expiry;}).sort(function(a,b){return a.expiry-b.expiry;});
+    if(!bs.length)return empty('No expiry dates recorded. Add them when you receive a delivery.');
+    return '<ul class="list">'+bs.map(function(b){var it=item(b.itemId),d=Math.round((sod(b.expiry)-sod(Date.now()))/DAY),cls=d<=7?'bad':d<=14?'warn':'';
+      return '<li class="rowstatic"><span class="rmain"><span class="rname">'+esc(it?it.name:'Deleted item')+'</span><span class="rmeta">'+b.qty+' left · expires '+fDate(b.expiry)+'</span></span><span class="pill '+cls+'">'+(d<0?'Expired':d===0?'Today':d+' days')+'</span></li>';}).join('')+'</ul>';
+  },
+  log:function(){
+    var ms=S.moves.slice(-60).reverse();
+    if(!ms.length)return empty('No stock changes yet.');
+    return '<ul class="list">'+ms.map(function(m){var it=item(m.itemId),u=S.users.filter(function(x){return x.id===m.user;})[0];
+      return '<li class="rowstatic"><span class="rmain"><span class="rname">'+esc(it?it.name:'Deleted item')+'</span><span class="rmeta">'+esc(REASON[m.reason]||m.reason)+(m.note?' · '+esc(m.note):'')+' · '+fDate(m.t)+' '+fTime(m.t)+(u?' · '+esc(u.name):'')+'</span></span><span class="rprice '+(m.qty<0?'bad':'good')+'">'+(m.qty>0?'+':'−')+Math.abs(m.qty)+'</span></li>';}).join('')+'</ul>';
+  }
+};
+function viewStock(){
+  return '<div class="seg wrap" role="group" aria-label="Stock tools">'+[['low','Low stock'],['receive','Receive'],['adjust','Adjust'],['repack','Repack'],['expiry','Expiry'],['log','Log']].map(function(o){return '<button class="'+(ui.stockSeg===o[0]?'on':'')+'" aria-pressed="'+(ui.stockSeg===o[0])+'" data-act="stockSeg" data-s="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>'+STOCK[ui.stockSeg]();
+}
+function recvLine(l,ix){
+  return '<div class="rline"><select class="input" data-r="itemId" data-ix="'+ix+'" aria-label="Item"><option value="">Choose an item…</option>'+S.items.filter(function(i){return !i.parentId;}).map(function(i){return '<option value="'+i.id+'"'+(i.id===l.itemId?' selected':'')+'>'+esc(i.name)+'</option>';}).join('')+'</select>'+
+    '<input class="input" data-r="qty" data-ix="'+ix+'" inputmode="numeric" placeholder="Qty" aria-label="Quantity" value="'+esc(l.qty)+'">'+
+    '<input class="input money" data-r="cost" data-ix="'+ix+'" inputmode="decimal" placeholder="Cost each" aria-label="Cost each in pesos" value="'+esc(l.cost)+'">'+
+    '<input class="input" type="date" data-r="expiry" data-ix="'+ix+'" aria-label="Expiry date (optional)" value="'+esc(l.expiry)+'">'+
+    '<button class="x" data-act="recvDel" data-ix="'+ix+'" aria-label="Remove this line">×</button></div>';
+}
+function recvTotals(){
+  var R=ui.recv,goods=0;
+  R.lines.forEach(function(l){var q=intv(l.qty),c=money(l.cost);if(isFinite(q)&&isFinite(c))goods+=q*c;});
+  var fee=money(R.fee);if(!isFinite(fee))fee=0;
+  return {goods:goods,fee:fee,total:goods+fee};
+}
+function recvTotalHTML(){var t=recvTotals();return '<div class="kv"><span class="muted">Goods</span><strong>'+P(t.goods)+'</strong></div><div class="kv total"><span>Total</span><strong>'+P(t.total)+'</strong></div>';}
+function adjDiff(){
+  var it=item(ui.adj.itemId),c=intv(ui.adj.counted);
+  if(!it||!isFinite(c))return 'The app shows '+(it?it.stock:'—')+'.';
+  var d=c-it.stock;
+  return d===0?'Matches the app exactly.':'The app shows '+it.stock+'. Saving records '+(d>0?'+':'−')+Math.abs(d)+' as a shelf-count correction.';
+}
+
+/* ---------- UTANG ---------- */
+function viewUtang(){
+  var rows=S.customers.map(function(c){return {c:c,b:balance(c.id),o:oldestUnpaid(c.id)};}).sort(function(a,b){return b.b-a.b;});
+  var total=sum(rows,function(r){return Math.max(0,r.b);}),n=rows.filter(function(r){return r.b>0;}).length;
+  return '<div class="hero"><span class="lbl">Out on credit</span><strong>'+P(total)+'</strong><span class="muted">'+n+' '+(n===1?'person owes':'people owe')+' the store</span></div>'+
+    '<div class="row end"><button class="btn primary" data-act="newCustomer">Add customer</button></div>'+
+    (rows.length?'':'<div class="list">'+empty('No customers yet. Add the people who buy on credit.')+'</div>')+'<ul class="list">'+rows.map(function(r){var age=r.o?ago(r.o):0,over=r.c.limit&&r.b>r.c.limit;
+      return '<li><button class="rowbtn" data-act="openCust" data-id="'+r.c.id+'"><span class="rmain"><span class="rname">'+esc(r.c.name)+(r.c.suki?'<span class="tag">Suki</span>':'')+'</span><span class="rmeta">'+esc(r.c.purok||'')+(r.b>0&&r.o?' · oldest unpaid '+age+' day'+(age===1?'':'s'):r.b<=0?' · nothing owed':'')+'</span></span>'+
+      '<span class="rside"><span class="rprice'+(over?' bad':'')+'">'+P(r.b)+'</span>'+(r.b>0&&age>=30?'<span class="pill bad">30+ days</span>':r.b>0&&age>=14?'<span class="pill warn">14+ days</span>':over?'<span class="pill bad">Over limit</span>':'')+'</span></button></li>';}).join('')+'</ul>';
+}
+function statement(cid){
+  var es=S.credit.filter(function(e){return e.customerId===cid;}).sort(function(a,b){return a.t-b.t;}),run=0;
+  return es.map(function(e){run+=e.amount;var what;
+    if(e.amount>0){var s=S.sales.filter(function(x){return x.id===e.saleId;})[0];what=s?s.lines.map(function(l){return l.name+(l.qty>1?' ×'+l.qty:'');}).join(', '):'Utang';}
+    else what=e.method==='void'?'Cancelled sale':'Bayad · '+(e.method==='gcash'?'GCash':'cash');
+    return {e:e,what:what,run:run};}).reverse();
+}
+function custSheet(cid){
+  var c=cust(cid),b=balance(cid),st=statement(cid);
+  return '<h3>'+esc(c.name)+(c.suki?'<span class="tag">Suki</span>':'')+'</h3><div class="big"><span class="lbl">Owes</span><strong class="'+(c.limit&&b>c.limit?'bad':'')+'">'+P(b)+'</strong><span class="muted">Limit '+(c.limit?P(c.limit):'none')+(c.purok?' · '+esc(c.purok):'')+'</span></div>'+
+    '<div class="actions"><button class="btn primary grow" data-act="bayad" data-id="'+cid+'"'+(b<=0?' disabled':'')+'>Record bayad</button><button class="btn ghost" data-act="copyStatement" data-id="'+cid+'">Copy statement</button><button class="btn ghost" data-act="editCust" data-id="'+cid+'">Edit</button></div><div id="copyFallback"></div>'+
+    (st.length?'<div class="tblwrap"><table class="tbl"><thead><tr><th>Date</th><th>What</th><th class="n">Amount</th><th class="n">Balance</th></tr></thead><tbody>'+st.map(function(r){return '<tr><td class="n" style="text-align:left">'+fDate(r.e.t)+'</td><td>'+esc(r.what)+'</td><td class="n '+(r.e.amount<0?'good':'')+'">'+(r.e.amount<0?'−':'+')+P(Math.abs(r.e.amount)).slice(0)+'</td><td class="n">'+P(r.run)+'</td></tr>';}).join('')+'</tbody></table></div>':empty('No utang recorded yet.'));
+}
+function custForm(cid){
+  var c=cid?cust(cid):{name:'',phone:'',purok:'',limit:30000,suki:false};
+  return '<h3>'+(cid?'Edit customer':'New customer')+'</h3><div class="form"><label class="fl" for="c_name">Name</label><input id="c_name" class="input" value="'+esc(c.name)+'" data-autofocus>'+
+    '<div class="two"><div><label class="fl" for="c_phone">Phone (optional)</label><input id="c_phone" class="input" inputmode="tel" value="'+esc(c.phone)+'"></div><div><label class="fl" for="c_purok">Purok or street</label><input id="c_purok" class="input" value="'+esc(c.purok)+'"></div></div>'+
+    '<label class="fl" for="c_limit">Credit limit (₱)</label><input id="c_limit" class="input money" inputmode="decimal" value="'+(c.limit?(c.limit/100).toFixed(2):'')+'"><p class="note">A warning only. It never blocks a sale.</p>'+
+    '<label class="check"><input type="checkbox" id="c_suki"'+(c.suki?' checked':'')+'> Suki (regular customer)</label><p id="custErr" class="flag bad" hidden></p>'+
+    '<button class="btn primary wide" data-act="saveCustomer" data-id="'+(cid||'')+'">Save customer</button></div>';
+}
+
+/* ---------- MONEY ---------- */
+function viewMoney(){
+  var s=openSession(),h='';
+  if(!s)h+='<div class="card"><h3>Open the day</h3><p class="note">Count the bills and coins you start with. Closing is measured against this.</p><label class="fl" for="m_float">Starting cash (₱)</label><input id="m_float" class="input money" inputmode="decimal" value="500.00"><button class="btn primary wide" data-act="openDay">Open the day</button></div>';
+  else{var d=drawerOf(S,s),mv=S.cashMoves.filter(function(m){return m.sessionId===s.id;});
+    h+='<div class="card"><div class="cardhead"><h3>Cash drawer</h3><span class="muted">Opened '+fTime(s.openedAt)+'</span></div><div class="big"><span class="lbl">Should be in the drawer</span><strong>'+P(d.expected)+'</strong></div>'+
+      '<dl class="kvs"><div><dt>Starting cash</dt><dd>'+P(d.float)+'</dd></div><div><dt>Cash sales</dt><dd>+ '+P(d.cashSales)+'</dd></div><div><dt>Bayad in cash</dt><dd>+ '+P(d.bayad)+'</dd></div>'+(d.inn?'<div><dt>Cash added</dt><dd>+ '+P(d.inn)+'</dd></div>':'')+'<div><dt>Paid out</dt><dd>− '+P(d.out)+'</dd></div></dl>'+
+      '<div class="kv"><span class="muted">GCash / Maya today (not in drawer)</span><strong>'+P(d.gcash)+'</strong></div>'+
+      (mv.length?'<div>'+mv.map(function(m){return '<div class="kv"><span class="muted">'+fTime(m.t)+' · '+esc(m.reason)+(m.note?' · '+esc(m.note):'')+'</span><strong>'+(m.amount<0?'−':'+')+P(Math.abs(m.amount))+'</strong></div>';}).join('')+'</div>':'')+
+      '<div class="actions"><button class="btn ghost grow" data-act="paidOut">Paid out</button><button class="btn primary grow" data-act="closeDay">Close the day</button></div></div>';}
+  if(owner())h+=capitalCard()+expensesCard();
+  var past=S.sessions.filter(function(x){return x.closedAt;}).slice(-7).reverse();
+  if(past.length)h+='<div class="card"><h3>Past days</h3><div class="tblwrap"><table class="tbl"><thead><tr><th>Day</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Over / short</th></tr></thead><tbody>'+past.map(function(x){var e=x.expected!=null?x.expected:drawerOf(S,x).expected,df=(x.counted||0)-e;
+    return '<tr><td>'+fDay(x.openedAt)+'</td><td class="n">'+P(e)+'</td><td class="n">'+P(x.counted)+'</td><td class="n"><span class="pill '+(df<0?'bad':df>0?'warn':'good')+'">'+(df===0?'Exact':(df>0?'+':'')+P(df))+'</span></td></tr>';}).join('')+'</tbody></table></div></div>';
+  return h;
+}
+function capitalCard(){
+  var stock=sum(S.items,function(i){return Math.max(0,i.stock)*i.cost;}),out=sum(S.customers,function(c){return Math.max(0,balance(c.id));}),s=openSession();
+  var cash=s?drawerOf(S,s).expected:((S.sessions.filter(function(x){return x.closedAt;}).slice(-1)[0]||{}).counted||0);
+  return '<div class="card"><div class="cardhead"><h3>Where your puhunan is</h3><span class="muted">At cost</span></div><dl class="kvs"><div><dt>On the shelves</dt><dd>'+P(stock)+'</dd></div><div><dt>Out on utang</dt><dd>'+P(out)+'</dd></div><div><dt>Cash in the drawer</dt><dd>'+P(cash)+'</dd></div></dl><div class="kv total"><span>Total capital</span><strong>'+P(stock+out+cash)+'</strong></div>'+
+    (out>0.25*(stock+out+cash)?'<p class="flag warn">Over a quarter of your capital is in utang.</p>':'')+'</div>';
+}
+function expensesCard(){
+  var T=new Date(),m0=new Date(T.getFullYear(),T.getMonth(),1).getTime();
+  var ex=S.expenses.filter(function(e){return e.t>=m0;}).sort(function(a,b){return b.t-a.t;});
+  var sales=S.sales.filter(function(x){return x.status==='done'&&x.t>=m0;});
+  var gp=sum(sales,function(x){return sum(x.lines,function(l){return l.qty*(l.price-l.cost);});});
+  var draw=sum(S.moves.filter(function(m){return m.reason==='draw'&&m.t>=m0;}),function(m){var it=item(m.itemId);return -m.qty*(it?it.cost:0);});
+  var exT=sum(ex,function(e){return e.amount;});
+  return '<div class="card"><div class="cardhead"><h3>This month</h3><button class="link" data-act="addExpense">+ Add expense</button></div>'+
+    '<dl class="kvs"><div><dt>Gross profit from sales</dt><dd>'+P(gp)+'</dd></div><div><dt>Expenses</dt><dd>− '+P(exT)+'</dd></div>'+(draw?'<div><dt>Goods taken for the house</dt><dd>− '+P(draw)+'</dd></div>':'')+'</dl>'+
+    '<div class="kv total"><span>Net profit so far</span><strong class="'+(gp-exT-draw<0?'bad':'')+'">'+P(gp-exT-draw)+'</strong></div>'+
+    (ex.length?'<div>'+ex.map(function(e){return '<div class="kv"><span class="muted">'+fDate(e.t)+' · '+esc(e.cat)+(e.note?' · '+esc(e.note):'')+'</span><strong>'+P(e.amount)+'</strong></div>';}).join('')+'</div>':'')+'</div>';
+}
+
+/* ---------- REPORTS ---------- */
+function rangeOf(){var now=Date.now(),T=sod(now);return ui.range==='today'?[T,now+1]:ui.range==='7'?[T-6*DAY,now+1]:[T-29*DAY,now+1];}
+function viewReports(){
+  if(!owner())return '<div class="card"><h3>Reports are for the owner</h3><p class="note">Profit and cost figures are hidden for helpers. Switch to the owner account from the name at the top.</p></div>';
+  var rg=rangeOf(),a=rg[0],b=rg[1];
+  var sales=S.sales.filter(function(x){return x.status==='done'&&x.t>=a&&x.t<b;});
+  var rev=sum(sales,function(x){return x.total;}),cogs=sum(sales,function(x){return sum(x.lines,function(l){return l.qty*l.cost;});}),gp=rev-cogs;
+  var given=sum(sales,function(x){return x.creditAmt;}),paid=sum(S.credit.filter(function(e){return e.amount<0&&(e.method==='cash'||e.method==='gcash')&&e.t>=a&&e.t<b;}),function(e){return -e.amount;});
+  var h='<div class="seg" role="group" aria-label="Period">'+[['today','Today'],['7','7 days'],['30','30 days']].map(function(o){return '<button class="'+(ui.range===o[0]?'on':'')+'" aria-pressed="'+(ui.range===o[0])+'" data-act="range" data-r="'+o[0]+'">'+o[1]+'</button>';}).join('')+'</div>';
+  h+='<div class="stats"><div class="stat"><span class="lbl">Sales</span><strong>'+P(rev)+'</strong><small>'+sales.length+' sale'+(sales.length===1?'':'s')+'</small></div><div class="stat"><span class="lbl">Gross profit</span><strong>'+P(gp)+'</strong><small>'+(rev?(gp/rev*100).toFixed(1):'0.0')+'% margin</small></div><div class="stat"><span class="lbl">Utang given</span><strong>'+P(given)+'</strong><small>Bayad in '+P(paid)+'</small></div></div>';
+  var hrs=[];for(var i=6;i<22;i++)hrs.push(0);
+  sales.forEach(function(x){var hr=new Date(x.t).getHours();if(hr>=6&&hr<22)hrs[hr-6]++;});
+  var mx=Math.max.apply(null,hrs.concat([1]));
+  h+='<div class="card"><div class="cardhead"><h3>Busiest hours</h3><span class="muted">Number of sales</span></div><div class="bars" aria-hidden="true">'+hrs.map(function(n){return '<i class="'+(n===mx&&n>0?'peak':'')+'" style="height:'+(n/mx*100)+'%" title="'+n+'"></i>';}).join('')+'</div><div class="barlbl">'+hrs.map(function(n,ix){var hr=ix+6;return '<span>'+(ix%3===0?(hr===12?'12p':hr>12?(hr-12)+'p':hr+'a'):'')+'</span>';}).join('')+'</div></div>';
+  var agg={};sales.forEach(function(x){x.lines.forEach(function(l){var g=agg[l.itemId]=agg[l.itemId]||{id:l.itemId,name:l.name,qty:0,rev:0,gp:0};g.qty+=l.qty;g.rev+=l.qty*l.price;g.gp+=l.qty*(l.price-l.cost);});});
+  var earn=Object.keys(agg).map(function(k){return agg[k];}).sort(function(x,y){return y.gp-x.gp;});
+  h+='<div class="card"><div class="cardhead"><h3>What earns</h3><span class="muted">By profit, not sales</span></div>'+(earn.length?'<div class="tblwrap"><table class="tbl"><thead><tr><th>Item</th><th class="n">Sold</th><th class="n">Sales</th><th class="n">Profit</th><th class="n">Margin</th></tr></thead><tbody>'+earn.slice(0,10).map(function(g){var pc=g.rev?g.gp/g.rev*100:0;return '<tr><td>'+esc(g.name)+'</td><td class="n">'+g.qty+'</td><td class="n">'+P(g.rev)+'</td><td class="n strong">'+P(g.gp)+'</td><td class="n'+(pc<10?' bad':'')+'">'+pc.toFixed(0)+'%</td></tr>';}).join('')+'</tbody></table></div>':empty('No sales in this period yet.'))+'</div>';
+  var since=Date.now()-30*DAY,sold={};S.moves.forEach(function(m){if(m.reason==='sale'&&m.t>=since)sold[m.itemId]=1;});
+  var dead=S.items.filter(function(i){return i.stock>0&&!sold[i.id]&&!i.parentId;});
+  var exp=S.batches.filter(function(bt){return bt.qty>0&&bt.expiry&&bt.expiry-Date.now()<=14*DAY;}).length;
+  var low=S.items.filter(function(i){return i.stock<=i.reorder;}).length;
+  h+='<div class="stats"><button class="stat" data-act="goStock" data-s="low" style="text-align:left"><span class="lbl">To buy</span><strong>'+low+'</strong><small>items at reorder level</small></button><button class="stat" data-act="goStock" data-s="expiry" style="text-align:left"><span class="lbl">Expiring</span><strong>'+exp+'</strong><small>batches within 14 days</small></button><div class="stat"><span class="lbl">Dead stock</span><strong>'+P(sum(dead,function(i){return i.stock*i.cost;}))+'</strong><small>'+dead.length+' items, no sale in 30 days</small></div></div>';
+  if(dead.length)h+='<div class="card"><div class="cardhead"><h3>Dead stock</h3><span class="muted">Capital sitting on the shelf</span></div>'+dead.map(function(i){return '<div class="kv"><span>'+esc(i.name)+' <span class="muted">· '+i.stock+' '+esc(i.unit)+'</span></span><strong>'+P(i.stock*i.cost)+'</strong></div>';}).join('')+'<p class="note">Consider a small discount, or stop reordering these.</p></div>';
+  var hist=S.sales.filter(function(x){return x.t>=a&&x.t<b;}).slice(-30).reverse();
+  h+='<h2 class="sec">Sales <span class="muted">tap to see or cancel</span></h2>'+(hist.length?'<ul class="list">'+hist.map(function(x){var c=x.customerId?cust(x.customerId):null;
+    return '<li><button class="rowbtn" data-act="openSale" data-id="'+x.id+'"><span class="rmain"><span class="rname">#'+x.id+' · '+fTime(x.t)+(ui.range!=='today'?' · '+fDate(x.t):'')+'</span><span class="rmeta">'+sum(x.lines,function(l){return l.qty;})+' items · '+(x.method==='cash'?'Cash':x.method==='gcash'?'GCash / Maya':'Utang · '+esc(c?c.name:''))+'</span></span><span class="rside"><span class="rprice">'+P(x.total)+'</span>'+(x.status==='void'?'<span class="pill bad">Cancelled</span>':'')+'</span></button></li>';}).join('')+'</ul>':empty('No sales in this period.'));
+  return h;
+}
+function saleSheet(id){
+  var s=S.sales.filter(function(x){return x.id===id;})[0];if(!s)return '';
+  return '<h3>Sale #'+s.id+(s.status==='void'?' <span class="pill bad">Cancelled</span>':'')+'</h3>'+receiptHTML(s)+
+    (s.status==='done'&&owner()?'<div id="voidBox"><button class="btn danger wide" data-act="askVoid" data-id="'+s.id+'">Cancel this sale</button></div>':'')+
+    (s.status==='done'&&!owner()?'<p class="note">Only the owner can cancel a finished sale.</p>':'');
+}
+function voidSale(id){
+  var s=S.sales.filter(function(x){return x.id===id;})[0];if(!s||s.status!=='done')return;
+  s.status='void';
+  s.lines.forEach(function(l){move(l.itemId,l.qty,'void',s.id);});
+  if(s.creditAmt>0)S.credit.push({id:++S.seq,t:Date.now(),customerId:s.customerId,amount:-s.creditAmt,saleId:s.id,method:'void',note:'Cancelled sale #'+s.id});
+  save();closeSheet();render();toast('Sale #'+id+' cancelled. Stock returned'+(s.creditAmt?' and utang removed':'')+'.');
+}
+
+/* ---------- settings & users ---------- */
+function settingsSheet(){
+  var own=owner(),h='<h3>Settings</h3><div class="form">';
+  if(own)h+='<label class="fl" for="st_name">Store name</label><input id="st_name" class="input" value="'+esc(S.storeName)+'">';
+  h+='<div class="card"><h3>Backup</h3><p class="note">'+(NATIVE?'Save a backup file to Google Drive or Files at least once a week. If this phone is lost or reset, the backup is the only copy.':'The prototype keeps data in this browser only. Copy a backup to keep it, or paste one to restore.')+'</p><div class="actions">'+
+    (NATIVE?'<button class="btn ghost grow" data-act="saveBackupFile">Save backup file</button>'+(own?'<button class="btn ghost grow" data-act="openBackupFile">Restore from file</button>':''):'<button class="btn ghost grow" data-act="showBackup">Show backup</button>'+(own?'<button class="btn ghost grow" data-act="showRestore">Restore</button>':''))+'</div><div id="backupBox"></div></div>';
+  if(own){
+    h+='<div class="card"><h3>Staff and PINs</h3>'+S.users.map(function(u,ix){return '<div class="two"><div><label class="fl" for="us_n'+ix+'">'+(u.role==='owner'?'Owner':'Helper')+' name</label><input id="us_n'+ix+'" class="input" value="'+esc(u.name)+'"></div><div><label class="fl" for="us_p'+ix+'">4-digit PIN</label><input id="us_p'+ix+'" class="input" inputmode="numeric" maxlength="4" value="'+esc(u.pin)+'"></div></div>';}).join('')+
+      '<p class="note">Helpers can sell and receive stock, but cannot see costs or profit, or cancel a finished sale.</p><p id="staffErr" class="flag bad" hidden></p><button class="btn ghost wide" data-act="saveStaff">Save staff</button></div>';
+    h+='<div class="card"><h3>Suppliers</h3>'+S.suppliers.concat([{id:'',name:'',days:''}]).map(function(x,ix){return '<div class="two"><div><label class="fl" for="sp_n'+ix+'">'+(x.id?'Name':'Add a supplier')+'</label><input id="sp_n'+ix+'" class="input" value="'+esc(x.name)+'"'+(x.id?'':' placeholder="e.g. Puregold wholesale"')+'></div><div><label class="fl" for="sp_d'+ix+'">Delivery days</label><input id="sp_d'+ix+'" class="input" value="'+esc(x.days)+'" placeholder="e.g. Tue, Fri"></div></div>';}).join('')+
+      '<p class="note">Clear a name to remove that supplier.</p><button class="btn ghost wide" data-act="saveSuppliers">Save suppliers</button></div>';
+    h+='<div class="card"><h3>Categories</h3><label class="fl" for="st_cats">One per line</label><textarea id="st_cats" class="input plain">'+esc(S.categories.join('\n'))+'</textarea><button class="btn ghost wide" data-act="saveCategories">Save categories</button></div>';
+    h+='<div class="card"><h3>Start over</h3><p class="note">Replaces everything on this '+(NATIVE?'phone':'browser')+'. Save a backup first if you want to keep it.</p><div id="resetBox" class="actions"><button class="btn danger grow" data-act="askReset" data-k="sample">Load sample store</button><button class="btn danger grow" data-act="askReset" data-k="empty">Empty store</button></div></div>';
+  }else h+='<p class="note">Store settings are for the owner. Switch to the owner account from the name at the top.</p>';
+  return h+'</div>';
+}
+function userSheet(){
+  return '<h3>Who is minding the store?</h3><div class="list">'+S.users.map(function(u){return '<button class="rowbtn" data-act="pickUser" data-id="'+u.id+'"><span class="rmain"><span class="rname">'+esc(u.name)+'</span><span class="rmeta">'+(u.role==='owner'?'Owner':'Helper')+'</span></span>'+(u.id===S.userId?'<span class="pill good">Now</span>':'')+'</button>';}).join('')+'</div><p class="note">Sample PINs: Rjay 1234, Helper 0000.</p>';
+}
+function pinSheet(){
+  var u=S.users.filter(function(x){return x.id===ui.pinUser;})[0];
+  return '<h3>PIN for '+esc(u.name)+'</h3><div class="pindots" aria-label="'+ui.pin.length+' of 4 digits">'+[0,1,2,3].map(function(i){return '<i class="'+(i<ui.pin.length?'on':'')+'"></i>';}).join('')+'</div><div class="pinpad">'+['1','2','3','4','5','6','7','8','9','','0','⌫'].map(function(k){return k===''?'<span></span>':'<button data-act="pin" data-k="'+k+'" aria-label="'+(k==='⌫'?'Delete':k)+'">'+k+'</button>';}).join('')+'</div>';
+}
+
+var VIEWS={sell:viewSell,items:viewItems,stock:viewStock,utang:viewUtang,money:viewMoney,reports:viewReports};
+
+/* ---------- actions ---------- */
+function setTab(t){ui.tab=t;try{localStorage.setItem(KEY+':tab',t);}catch(e){}render();window.scrollTo(0,0);}
+var ACT={
+  tab:function(d){setTab(d.t);},
+  closeSheet:closeSheet,
+  add:function(d){addToCart(d.id,d.from==='search');},
+  registerNew:function(d){setTab('items');showSheet(itemSheet('',d.code));},
+  qty:function(d){var l=ui.cart[+d.ix];if(!l)return;l.qty+= +d.d;if(l.qty<=0)ui.cart.splice(+d.ix,1);render();},
+  editPrice:function(d){var l=ui.cart[+d.ix];if(!l)return;ui.priceIx=+d.ix;var it=item(l.itemId);
+    showSheet('<h3>Price for this sale</h3><p class="note">'+esc(l.name)+' · list price '+P(it?it.price:l.price)+'. This changes this sale only.</p><label class="fl" for="op_price">Price each (₱)</label><input id="op_price" class="input money big" inputmode="decimal" value="'+(l.price/100).toFixed(2)+'" data-autofocus><div class="actions"><button class="btn ghost grow" data-act="resetPrice">Use list price</button><button class="btn primary grow" data-act="savePrice">Apply</button></div>');},
+  savePrice:function(){var l=ui.cart[ui.priceIx],v=money($('#op_price').value);if(!l)return;if(!isFinite(v)||v<0){toast('Enter a price like 15 or 15.50.');return;}l.price=v;closeSheet();render();},
+  resetPrice:function(){var l=ui.cart[ui.priceIx];if(!l)return;var it=item(l.itemId);if(it)l.price=it.price;closeSheet();render();},
+  clearCart:function(){var keep=ui.cart;ui.cart=[];render();toast('Sale cleared.');ui.lastCleared=keep;},
+  hold:function(){if(!ui.cart.length)return;S.held.push({id:'h'+(++S.seq),t:Date.now(),cart:ui.cart,total:cartTotal(),note:'Held '+fTime(Date.now())});ui.cart=[];save();render();toast('Sale on hold. Tap it above to bring it back.');},
+  resume:function(d){var h=S.held.filter(function(x){return x.id===d.id;})[0];if(!h)return;S.held=S.held.filter(function(x){return x.id!==d.id;});
+    if(ui.cart.length)S.held.push({id:'h'+(++S.seq),t:Date.now(),cart:ui.cart,total:cartTotal(),note:'Held '+fTime(Date.now())});ui.cart=h.cart;save();render();},
+  pay:function(){if(!ui.cart.length)return;ui.pay={method:'cash',tendered:'',customerId:'',cashNow:'',ref:''};showSheet(paySheet());},
+  payMethod:function(d){ui.pay.method=d.m;showSheet(paySheet());},
+  tender:function(d){ui.pay.tendered=(+d.v/100).toFixed(2);var i=$('#tendered');if(i)i.value=ui.pay.tendered;$('#sukliBox').innerHTML=sukliHTML();},
+  complete:completeSale,
+  nextCustomer:function(){closeSheet();ui.focusScan=true;setTab('sell');},
+  editItem:function(d){showSheet(itemSheet(d.id,d.code));},
+  genCode:function(){var c;do{c='SS'+String(Date.now()).slice(-10);}while(S.items.some(function(i){return i.barcode===c;}));$('#f_barcode').value=c;},
+  saveItem:saveItem,
+  askDelete:function(){var it=item(ui.edit);$('#delConfirm').innerHTML='<div class="confirm"><p>Delete '+esc(it.name)+'? Past sales keep their record.</p><div class="actions"><button class="btn ghost grow" data-act="cancelDelete">Keep it</button><button class="btn danger grow" data-act="confirmDelete">Delete</button></div></div>';},
+  cancelDelete:function(){$('#delConfirm').innerHTML='';},
+  confirmDelete:function(){var it=item(ui.edit);dropPhoto(it.photo);S.items=S.items.filter(function(i){return i.id!==ui.edit;});save();closeSheet();render();toast('Deleted '+it.name+'.');},
+  itemCat:function(d){ui.itemCat=d.c;render();},
+  stockSeg:function(d){ui.stockSeg=d.s;render();},
+  goStock:function(d){ui.stockSeg=d.s;setTab('stock');},
+  receiveFrom:function(d){var lows=S.items.filter(function(i){return i.stock<=i.reorder&&!i.parentId&&i.sup===d.s;});
+    ui.recv={supplierId:d.s,lines:lows.map(function(i){return {itemId:i.id,qty:String(suggestQty(i)),cost:(i.cost/100).toFixed(2),expiry:''};}),fee:'',paid:true};
+    if(!ui.recv.lines.length)ui.recv.lines.push({itemId:'',qty:'',cost:'',expiry:''});ui.stockSeg='receive';render();},
+  recvAdd:function(){ui.recv.lines.push({itemId:'',qty:'',cost:'',expiry:''});$('#r_lines').innerHTML=ui.recv.lines.map(recvLine).join('');},
+  recvDel:function(d){ui.recv.lines.splice(+d.ix,1);if(!ui.recv.lines.length)ui.recv.lines.push({itemId:'',qty:'',cost:'',expiry:''});$('#r_lines').innerHTML=ui.recv.lines.map(recvLine).join('');$('#r_total').innerHTML=recvTotalHTML();},
+  recvSave:function(){
+    var R=ui.recv,ok=[],bad=false;
+    R.lines.forEach(function(l){if(!l.itemId&&!l.qty&&!l.cost)return;var q=intv(l.qty),c=money(l.cost);if(!l.itemId||!isFinite(q)||q<=0||!isFinite(c)||c<0)bad=true;else ok.push({itemId:l.itemId,qty:q,cost:c,expiry:l.expiry});});
+    if(bad||!ok.length){toast(bad?'Each line needs an item, a quantity and a cost each.':'Add at least one item.');return;}
+    var t=recvTotals(),s=sup(R.supplierId),now=Date.now();
+    ok.forEach(function(l){var it=item(l.itemId),val=l.qty*l.cost,share=t.goods?t.fee*val/t.goods:0;
+      it.cost=Math.round(l.cost+share/l.qty);move(l.itemId,l.qty,'delivery','',s?s.name:'');
+      if(l.expiry){var ex=Date.parse(l.expiry+'T12:00:00');if(isFinite(ex))S.batches.push({id:++S.seq,itemId:l.itemId,qty:l.qty,expiry:ex,receivedAt:now});}});
+    S.purchases.push({id:++S.seq,t:now,supplierId:R.supplierId,lines:ok,fee:t.fee,paid:R.paid});
+    var sess=openSession(),note='';
+    if(R.paid){if(sess)S.cashMoves.push({id:++S.seq,t:now,sessionId:sess.id,amount:-t.total,reason:'Supplier',note:s?s.name:''});else note=' Open the day to take it from the drawer.';}
+    ui.recv=null;save();render();toast('Received '+ok.length+' item'+(ok.length===1?'':'s')+' from '+(s?s.name:'supplier')+'. Stock updated.'+note);},
+  adjType:function(d){ui.adj.type=d.t;render();},
+  adjSave:function(){var A=ui.adj,it=item(A.itemId);if(!it){toast('Choose an item first.');return;}
+    if(A.type==='count'){var c=intv(A.counted);if(!isFinite(c)||c<0){toast('Enter the number counted on the shelf.');return;}var df=c-it.stock;if(df===0){toast('Count matches. Nothing to change.');return;}move(it.id,df,'count','',A.note);}
+    else{var q=intv(A.qty);if(!isFinite(q)||q<=0){toast('Enter how many.');return;}move(it.id,-q,A.type,'',A.note);}
+    toast('Saved: '+it.name+' now '+it.stock+'.');ui.adj={itemId:'',type:A.type,qty:'',counted:'',note:''};save();render();},
+  openPack:function(d){var k=item(d.id),p=item(k.parentId);if(!p||p.stock<1)return;move(p.id,-1,'repack','', 'Opened for '+k.name);move(k.id,k.perPack,'repack','','From '+p.name);if(p.cost)k.cost=Math.round(p.cost/k.perPack);save();render();toast('Opened 1 '+p.unit+': +'+k.perPack+' '+k.unit+' of '+k.name+'.');},
+  openCust:function(d){showSheet(custSheet(d.id));},
+  newCustomer:function(d){ui.afterCustomer=d.from==='pay'?'pay':null;showSheet(custForm(''));},
+  editCust:function(d){ui.afterCustomer=null;showSheet(custForm(d.id));},
+  saveCustomer:function(d){var name=$('#c_name').value.trim(),lim=$('#c_limit').value.trim()?money($('#c_limit').value):0;
+    if(!name){var e=$('#custErr');e.textContent='Enter a name.';e.hidden=false;return;}
+    if(!isFinite(lim)){var e2=$('#custErr');e2.textContent='Limit should look like 300 or 300.00.';e2.hidden=false;return;}
+    var c=d.id?cust(d.id):null,data={name:name,phone:$('#c_phone').value.trim(),purok:$('#c_purok').value.trim(),limit:lim,suki:$('#c_suki').checked};
+    if(c){for(var k in data)c[k]=data[k];}else{c=data;c.id='c'+(++S.seq);S.customers.push(c);}
+    save();render();
+    if(ui.afterCustomer==='pay'){ui.pay.method='utang';ui.pay.customerId=c.id;showSheet(paySheet());}else showSheet(custSheet(c.id));
+    toast('Saved '+name+'.');},
+  bayad:function(d){var c=cust(d.id),b=balance(d.id);ui.bayadM='cash';ui.bayadC=d.id;
+    showSheet('<h3>Bayad from '+esc(c.name)+'</h3><p class="note">Owes '+P(b)+'.</p><label class="fl" for="b_amt">Amount paid (₱)</label><input id="b_amt" class="input money big" inputmode="decimal" placeholder="0.00" data-autofocus><div class="chips"><button class="chip" data-act="bayadFull">Full '+P(b)+'</button></div>'+
+    '<div class="seg" id="bayadSeg">'+bayadSeg()+'</div><button class="btn primary wide" data-act="saveBayad">Record bayad</button>');},
+  bayadFull:function(){$('#b_amt').value=(balance(ui.bayadC)/100).toFixed(2);},
+  bayadM:function(d){ui.bayadM=d.m;$('#bayadSeg').innerHTML=bayadSeg();},
+  saveBayad:function(){var c=cust(ui.bayadC),b=balance(c.id),a=money($('#b_amt').value);
+    if(!isFinite(a)||a<=0){toast('Enter the amount paid.');return;}if(a>b){toast(c.name+' only owes '+P(b)+'.');return;}
+    S.credit.push({id:++S.seq,t:Date.now(),customerId:c.id,amount:-a,saleId:0,method:ui.bayadM,note:'Bayad'});save();render();showSheet(custSheet(c.id));
+    toast('Bayad '+P(a)+' recorded. '+c.name+' now owes '+P(balance(c.id))+'.');},
+  copyStatement:function(d){var c=cust(d.id),st=statement(d.id).slice().reverse();
+    var txt=S.storeName+' — utang of '+c.name+'\n'+st.map(function(r){return fDate(r.e.t)+'  '+r.what+'  '+(r.e.amount<0?'-':'+')+P(Math.abs(r.e.amount))+'  = '+P(r.run);}).join('\n')+'\nBalance: '+P(balance(c.id));
+    function fb(){$('#copyFallback').innerHTML='<label class="fl" for="stmt">Select and copy</label><textarea id="stmt" class="input" readonly>'+esc(txt)+'</textarea>';var t=$('#stmt');t.focus();t.select();}
+    try{navigator.clipboard.writeText(txt).then(function(){toast('Statement copied. Paste it into Messenger or SMS.');},fb);}catch(e){fb();}},
+  openDay:function(){var f=money($('#m_float').value);if(!isFinite(f)){toast('Enter the starting cash, like 500.');return;}S.sessions.push({id:'s'+(++S.seq),openedAt:Date.now(),float:f,closedAt:null,counted:null,expected:null,user:S.userId});save();render();toast('Day opened with '+P(f)+'.');},
+  paidOut:function(){showSheet('<h3>Paid out of the drawer</h3><label class="fl" for="po_amt">Amount (₱)</label><input id="po_amt" class="input money big" inputmode="decimal" placeholder="0.00" data-autofocus><label class="fl" for="po_reason">What for</label><select id="po_reason" class="input"><option>Supplier</option><option>Fare</option><option>Load wallet top-up</option><option>Owner took cash</option><option>Other</option></select><label class="fl" for="po_note">Note (optional)</label><input id="po_note" class="input"><button class="btn primary wide" data-act="savePaidOut">Record paid out</button>');},
+  savePaidOut:function(){var s=openSession(),a=money($('#po_amt').value);if(!s)return;if(!isFinite(a)||a<=0){toast('Enter the amount taken out.');return;}S.cashMoves.push({id:++S.seq,t:Date.now(),sessionId:s.id,amount:-a,reason:$('#po_reason').value,note:$('#po_note').value.trim()});save();closeSheet();render();toast('Paid out '+P(a)+'.');},
+  closeDay:function(){var s=openSession(),e=drawerOf(S,s).expected;showSheet('<h3>Close the day</h3><div class="big"><span class="lbl">Should be in the drawer</span><strong>'+P(e)+'</strong></div><label class="fl" for="cl_count">Counted in the drawer (₱)</label><input id="cl_count" class="input money big" inputmode="decimal" placeholder="0.00" data-autofocus><div class="sukli" id="clDiff"><span class="lbl">Over / short</span><strong>—</strong></div><button class="btn primary wide" data-act="saveClose">Close the day</button>');},
+  saveClose:function(){var s=openSession(),c=money($('#cl_count').value);if(!isFinite(c)){toast('Count the drawer and enter the total.');return;}var e=drawerOf(S,s).expected;s.closedAt=Date.now();s.counted=c;s.expected=e;save();closeSheet();render();toast(c===e?'Closed. The drawer is exact.':'Closed. '+(c>e?'Over by ':'Short by ')+P(Math.abs(c-e))+'.');},
+  addExpense:function(){showSheet('<h3>Add expense</h3><label class="fl" for="ex_cat">Kind</label><select id="ex_cat" class="input"><option>Electricity</option><option>Water</option><option>Rent</option><option>Transport</option><option>Ice and water</option><option>Wifi or load</option><option>Repairs</option><option>Other</option></select><label class="fl" for="ex_amt">Amount (₱)</label><input id="ex_amt" class="input money big" inputmode="decimal" placeholder="0.00" data-autofocus><label class="fl" for="ex_note">Note (optional)</label><input id="ex_note" class="input"><button class="btn primary wide" data-act="saveExpense">Save expense</button>');},
+  saveExpense:function(){var a=money($('#ex_amt').value);if(!isFinite(a)||a<=0){toast('Enter the amount.');return;}S.expenses.push({id:++S.seq,t:Date.now(),cat:$('#ex_cat').value,amount:a,note:$('#ex_note').value.trim()});save();closeSheet();render();toast('Expense saved.');},
+  range:function(d){ui.range=d.r;render();},
+  openSale:function(d){showSheet(saleSheet(+d.id));},
+  askVoid:function(d){$('#voidBox').innerHTML='<div class="confirm"><p>Cancel sale #'+d.id+'? Stock goes back on the shelf'+(S.sales.filter(function(x){return x.id===+d.id;})[0].creditAmt?' and the utang is removed':'')+'.</p><div class="actions"><button class="btn ghost grow" data-act="closeSheet">Keep sale</button><button class="btn danger grow" data-act="voidSale" data-id="'+d.id+'">Cancel sale</button></div></div>';},
+  voidSale:function(d){voidSale(+d.id);},
+  user:function(){showSheet(userSheet());},
+  pickUser:function(d){if(d.id===S.userId){closeSheet();return;}ui.pinUser=d.id;ui.pin='';showSheet(pinSheet());},
+  pin:function(d){if(d.k==='⌫')ui.pin=ui.pin.slice(0,-1);else if(ui.pin.length<4)ui.pin+=d.k;
+    if(ui.pin.length===4){var u=S.users.filter(function(x){return x.id===ui.pinUser;})[0];if(u&&u.pin===ui.pin){S.userId=u.id;save();closeSheet();render();toast('Now selling as '+u.name+'.');return;}ui.pin='';showSheet(pinSheet());toast('Wrong PIN. Try again.');return;}
+    showSheet(pinSheet());},
+  settings:function(){showSheet(settingsSheet());},
+  showBackup:function(){var txt=JSON.stringify(S);$('#backupBox').innerHTML='<label class="fl" for="bk">Backup ('+Math.round(txt.length/1024)+' KB)</label><textarea id="bk" class="input" readonly>'+esc(txt)+'</textarea><button class="btn ghost wide" data-act="copyBackup">Copy backup</button>';},
+  copyBackup:function(){var t=$('#bk');try{navigator.clipboard.writeText(t.value).then(function(){toast('Backup copied.');},function(){t.focus();t.select();toast('Select all and copy.');});}catch(e){t.focus();t.select();}},
+  showRestore:function(){$('#backupBox').innerHTML='<label class="fl" for="rs">Paste a backup</label><textarea id="rs" class="input"></textarea><button class="btn danger wide" data-act="restore">Replace everything with this backup</button>';},
+  restore:function(){var o;try{o=JSON.parse($('#rs').value);}catch(e){toast('That is not a StorePOS backup.');return;}if(!o||o.v!==1||!Array.isArray(o.items)){toast('That is not a StorePOS backup.');return;}S=normalize(o);ui.cart=[];save();closeSheet();render();toast('Backup restored.');},
+  askReset:function(d){ui.resetKind=d.k;$('#resetBox').innerHTML='<div class="confirm" style="flex:1"><p>'+(d.k==='sample'?'Erase this store and load the sample store?':'Erase everything and start an empty store?')+'</p><div class="actions"><button class="btn ghost grow" data-act="closeSheet">Keep my data</button><button class="btn danger grow" data-act="reset">Erase</button></div></div>';},
+  reset:function(){S.items.forEach(function(i){dropPhoto(i.photo);});S=normalize(ui.resetKind==='empty'?freshStore([]):seed());ui.cart=[];ui.recv=null;save();closeSheet();setTab('sell');toast(ui.resetKind==='empty'?'Empty store ready.':'Sample store loaded.');},
+  camScan:function(){scanBarcode('Scan an item to add it to the sale',function(code){var it=S.items.filter(function(i){return i.barcode===code;})[0];if(it){addToCart(it.id);toast('Added '+it.name+'.');}else unknownCode(code);});},
+  scanInto:function(){scanBarcode('Scan the item\'s barcode',function(code){var f=$('#f_barcode');if(!f)return;f.value=code;var other=S.items.filter(function(x){return x.barcode===code&&x.id!==ui.edit;})[0],e=$('#itemErr');if(other){e.textContent='Barcode '+code+' already belongs to '+other.name+'.';e.hidden=false;}else e.hidden=true;});},
+  itemPhoto:function(){takePhoto(function(url){ui.editPhoto=url;var r=$('#photoRow');if(r)r.innerHTML=photoRowHTML();});},
+  itemPhotoRemove:function(){ui.editPhoto='';var r=$('#photoRow');if(r)r.innerHTML=photoRowHTML();},
+  priceCheck:function(){showSheet(priceSheet());},
+  pcScan:function(){scanBarcode('Scan an item to check its price',function(code){if(!$('#pcResult'))showSheet(priceSheet());var it=S.items.filter(function(i){return i.barcode===code;})[0];$('#pcList').innerHTML='';
+    $('#pcResult').innerHTML=it?pcResultHTML(it):'<div class="pcres"><p class="note">No item has barcode <span class="mono">'+esc(code)+'</span> yet.</p><button class="btn primary" data-act="registerNew" data-code="'+esc(code)+'">Register this item</button></div>';});},
+  pcShow:function(d){var it=item(d.id);if(!it)return;$('#pcList').innerHTML='';$('#pcResult').innerHTML=pcResultHTML(it);},
+  pcAdd:function(d){var it=item(d.id);closeSheet();addToCart(d.id);setTab('sell');if(it)toast('Added '+it.name+'.');},
+  saveStaff:function(){var err=$('#staffErr'),nu=[];for(var i=0;i<S.users.length;i++){var n=$('#us_n'+i).value.trim(),p=$('#us_p'+i).value.trim();if(!n){err.textContent='Every staff member needs a name.';err.hidden=false;return;}if(!/^\d{4}$/.test(p)){err.textContent='PINs must be exactly 4 digits.';err.hidden=false;return;}nu.push([n,p]);}
+    nu.forEach(function(x,i){S.users[i].name=x[0];S.users[i].pin=x[1];});err.hidden=true;save();renderShell();toast('Staff saved.');},
+  saveSuppliers:function(){var out=[],n=S.suppliers.length;for(var i=0;i<=n;i++){var nm=$('#sp_n'+i).value.trim(),dy=$('#sp_d'+i).value.trim();if(i<n){if(nm)out.push({id:S.suppliers[i].id,name:nm,days:dy});}else if(nm)out.push({id:'s'+(++S.seq),name:nm,days:dy});}
+    S.suppliers=out;save();showSheet(settingsSheet());toast('Suppliers saved.');},
+  saveCategories:function(){var c=$('#st_cats').value.split('\n').map(function(x){return x.trim();}).filter(function(x,i,a){return x&&a.indexOf(x)===i;});if(!c.length){toast('Keep at least one category.');return;}
+    S.categories=c;if(ui.itemCat!=='All'&&c.indexOf(ui.itemCat)<0)ui.itemCat='All';save();render();toast('Categories saved.');},
+  saveBackupFile:function(){var d=new Date(),n='storepos-backup-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';NATIVE.saveBackup(JSON.stringify(S),n);},
+  openBackupFile:function(){NATIVE.openBackup(req(function(text){if(!text)return;var o;try{o=JSON.parse(text);}catch(e){toast('That file is not a StorePOS backup.');return;}if(!o||o.v!==1||!Array.isArray(o.items)){toast('That file is not a StorePOS backup.');return;}
+    ui.restoreObj=o;var b=$('#backupBox');if(b)b.innerHTML='<div class="confirm"><p>Replace everything with this backup ('+o.items.length+' items, '+(o.sales||[]).length+' sales)?</p><div class="actions"><button class="btn ghost grow" data-act="closeSheet">Cancel</button><button class="btn danger grow" data-act="restoreObj">Restore</button></div></div>';}));},
+  restoreObj:function(){if(!ui.restoreObj)return;S=normalize(ui.restoreObj);ui.restoreObj=null;ui.cart=[];save();closeSheet();render();toast('Backup restored.');}
+};
+function bayadSeg(){return [['cash','Cash'],['gcash','GCash / Maya']].map(function(o){return '<button class="'+(ui.bayadM===o[0]?'on':'')+'" aria-pressed="'+(ui.bayadM===o[0])+'" data-act="bayadM" data-m="'+o[0]+'">'+o[1]+'</button>';}).join('');}
+
+document.addEventListener('click',function(e){var t=e.target.closest('[data-act]');if(!t||t.disabled)return;var f=ACT[t.dataset.act];if(f){e.preventDefault();f(t.dataset,t);}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet();});
+document.addEventListener('input',function(e){
+  var t=e.target,id=t.id;
+  if(id==='tendered'){ui.pay.tendered=t.value;$('#sukliBox').innerHTML=sukliHTML();}
+  else if(id==='gref')ui.pay.ref=t.value;
+  else if(id==='cashNow'){ui.pay.cashNow=t.value;$('#utangInfo').innerHTML=utangInfoHTML();}
+  else if(id==='pc_q'){var ms=matches(t.value);$('#pcResult').innerHTML='';$('#pcList').innerHTML=ms.length?'<div class="list">'+ms.map(function(i){return '<button class="rowbtn" data-act="pcShow" data-id="'+i.id+'">'+thumb(i)+'<span class="rmain"><span class="rname">'+esc(i.name)+'</span><span class="rmeta">'+esc(i.barcode||'no barcode')+' · '+i.stock+' left</span></span><span class="rprice">'+P(i.price)+'</span></button>';}).join('')+'</div>':(t.value.trim()?empty('No item matches.'):'');}
+  else if(id==='itemQ'){ui.itemQ=t.value;$('#itemList').innerHTML=itemListHTML();}
+  else if(id==='f_price'||id==='f_cost'){var ml=$('#marginLine');if(ml)ml.innerHTML=marginLine(money($('#f_price').value),money(($('#f_cost')||{}).value),$('#f_unit').value);}
+  else if(id==='r_fee'){ui.recv.fee=t.value;$('#r_total').innerHTML=recvTotalHTML();}
+  else if(t.dataset&&t.dataset.r&&t.dataset.r!=='itemId'){ui.recv.lines[+t.dataset.ix][t.dataset.r]=t.value;$('#r_total').innerHTML=recvTotalHTML();}
+  else if(id==='a_qty')ui.adj.qty=t.value;
+  else if(id==='a_counted'){ui.adj.counted=t.value;$('#a_diff').textContent=adjDiff();}
+  else if(id==='a_note')ui.adj.note=t.value;
+  else if(id==='cl_count'){var s=openSession(),c=money(t.value),e2=drawerOf(S,s).expected;$('#clDiff').innerHTML=!isFinite(c)?'<span class="lbl">Over / short</span><strong>—</strong>':c===e2?'<span class="lbl">Exact</span><strong class="good">'+P(0)+'</strong>':'<span class="lbl">'+(c>e2?'Over':'Short')+'</span><strong class="'+(c>e2?'warn':'bad')+'">'+P(Math.abs(c-e2))+'</strong>';}
+});
+document.addEventListener('change',function(e){
+  var t=e.target,id=t.id;
+  if(id==='ucust'){ui.pay.customerId=t.value;$('#utangInfo').innerHTML=utangInfoHTML();}
+  else if(id==='r_sup')ui.recv.supplierId=t.value;
+  else if(id==='r_paid')ui.recv.paid=t.checked;
+  else if(t.dataset&&t.dataset.r==='itemId'){var l=ui.recv.lines[+t.dataset.ix],it=item(t.value);l.itemId=t.value;if(it){if(!l.cost)l.cost=(it.cost/100).toFixed(2);if(!l.qty)l.qty=String(suggestQty(it));}$('#r_lines').innerHTML=ui.recv.lines.map(recvLine).join('');$('#r_total').innerHTML=recvTotalHTML();}
+  else if(t.dataset&&t.dataset.r==='expiry'){ui.recv.lines[+t.dataset.ix].expiry=t.value;}
+  else if(id==='a_item'){ui.adj.itemId=t.value;var d=$('#a_diff');if(d)d.textContent=adjDiff();}
+  else if(id==='st_name'){var v=t.value.trim();if(v){S.storeName=v;save();renderShell();}}
+  else if(id==='f_unit'){var ml=$('#marginLine');if(ml)ml.innerHTML=marginLine(money($('#f_price').value),money(($('#f_cost')||{}).value),t.value);}
+});
+
+window.StorePOSBack=function(){if(!$('#sheet').hidden){closeSheet();return true;}if(ui.tab!=='sell'){setTab('sell');return true;}return false;};
+if(!VIEWS[ui.tab])ui.tab='sell';
+save();render();
+})();
+</script>
+</body>
+</html>
