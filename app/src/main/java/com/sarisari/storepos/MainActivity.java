@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Util.setupScreen(this, false);
         db = DbHelper.get(this);
         itemCount = findViewById(R.id.itemCount);
 

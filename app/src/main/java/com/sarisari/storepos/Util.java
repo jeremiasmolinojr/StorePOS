@@ -1,6 +1,11 @@
 package com.sarisari.storepos;
 
 import android.app.Activity;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import android.content.Context;
 import android.view.KeyEvent;
 import android.view.View;
@@ -88,5 +93,38 @@ public final class Util {
         field.requestFocus();
         InputMethodManager imm = (InputMethodManager) a.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) imm.showSoftInput(field, InputMethodManager.SHOW_IMPLICIT);
+    }
+
+    /**
+     * Sets up the screen's toolbar and keeps content clear of the system bars.
+     *
+     * Android 15 and newer draw apps edge-to-edge: the window extends behind the
+     * status bar and the navigation bar. Without this, the top of every screen
+     * slides underneath the clock and becomes unreadable and untappable.
+     */
+    public static void setupScreen(AppCompatActivity a, boolean showUpArrow) {
+        final Toolbar tb = a.findViewById(R.id.toolbar);
+        if (tb != null) {
+            a.setSupportActionBar(tb);
+            if (a.getSupportActionBar() != null) {
+                a.getSupportActionBar().setDisplayHomeAsUpEnabled(showUpArrow);
+            }
+            if (showUpArrow) tb.setNavigationOnClickListener(v -> a.finish());
+        }
+        View root = a.findViewById(R.id.root);
+        if (root == null) return;
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
+            Insets bars = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
+            // When the keyboard is open, pad for it instead of the nav bar.
+            int ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
+            v.setPadding(bars.left, 0, bars.right, Math.max(bars.bottom, ime));
+            // The toolbar grows upward behind the status bar, so the clock sits
+            // on the green bar instead of on top of the screen's content.
+            if (tb != null) tb.setPadding(0, bars.top, 0, 0);
+            return WindowInsetsCompat.CONSUMED;
+        });
+        ViewCompat.requestApplyInsets(root);
     }
 }

@@ -25,7 +25,7 @@ public class ItemListActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_item_list);
-        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        Util.setupScreen(this, true);
         db = DbHelper.get(this);
 
         search = findViewById(R.id.fieldSearch);
