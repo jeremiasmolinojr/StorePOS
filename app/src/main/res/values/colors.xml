@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#0F7B5F</color>
+    <color name="brand_dark">#0A5A45</color>
+    <color name="accent">#F2A900</color>
+    <color name="price">#0F7B5F</color>
+    <color name="muted">#6B7280</color>
+    <color name="card_bg">#F3F7F5</color>
+    <color name="danger">#C62828</color>
+</resources>
